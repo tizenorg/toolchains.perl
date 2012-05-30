@@ -27,6 +27,7 @@ URL:            http://www.perl.org/
 Source0:        http://search.cpan.org/CPAN/authors/id/R/RG/RGARCIA/perl-%{perl_version}.tar.gz
 Source10: 	macros.perl
 Source12:       perl-5.8.0-libnet.cfg
+Source1001: packaging/perl.manifest 
 
 # Removes date check, Fedora/RHEL specific
 Patch1:         perl-5.10.0-perlbug-tag.patch
@@ -721,6 +722,7 @@ find . -name \*.orig -exec rm -fv {} \;
 }
 
 %build
+cp %{SOURCE1001} .
 echo "RPM Build arch: %{_arch}"
 
 # use "lib", not %{_lib}, for privlib, sitelib, and vendorlib
@@ -870,6 +872,7 @@ rm -rf $RPM_BUILD_ROOT
 %postun libs -p /sbin/ldconfig
 
 %files
+%manifest perl.manifest
 %defattr(-,root,root,-)
 %doc Artistic AUTHORS  Copying README
 %doc %{_mandir}/man1/*.1*
@@ -1149,10 +1152,12 @@ rm -rf $RPM_BUILD_ROOT
 %exclude %{_mandir}/man3/version.*
 
 %files libs
+%manifest perl.manifest
 %defattr(-,root,root)
 %{_libdir}/perl5/%{perl_version}/%{perl_archname}/CORE/libperl.so
 
 %files devel
+%manifest perl.manifest
 %defattr(-,root,root,-)
 %doc Changes*
 %{_bindir}/enc2xs
@@ -1170,11 +1175,13 @@ rm -rf $RPM_BUILD_ROOT
 %attr(0644,root,root) %{_sysconfdir}/rpm/macros.perl
 
 %files Archive-Extract
+%manifest perl.manifest
 %defattr(-,root,root,-)
 %{_prefix}/lib/perl5/%{perl_version}/Archive/Extract.pm
 %doc %{_mandir}/man3/Archive::Extract.3*
 
 %files Archive-Tar
+%manifest perl.manifest
 %defattr(-,root,root,-)
 %{_bindir}/ptar
 %{_bindir}/ptardiff
@@ -1185,6 +1192,7 @@ rm -rf $RPM_BUILD_ROOT
 %doc %{_mandir}/man3/Archive::Tar* 
 
 %files Compress-Raw-Zlib
+%manifest perl.manifest
 %defattr(-,root,root,-)
 %dir %{_libdir}/perl5/%{version}/%{perl_archname}/Compress
 %{_libdir}/perl5/%{version}/%{perl_archname}/Compress/Raw/*
@@ -1193,12 +1201,14 @@ rm -rf $RPM_BUILD_ROOT
 %doc %{_mandir}/man3/Compress::Raw::Zlib*
 
 %files Compress-Zlib
+%manifest perl.manifest
 %defattr(-,root,root,-)
 %{_libdir}/perl5/%{version}/Compress/Zlib.pm
 %{_libdir}/perl5/%{version}/%{perl_archname}/auto/Compress/Zlib/*
 %doc %{_mandir}/man3/Compress::Zlib*
 
 %files CPAN
+%manifest perl.manifest
 %defattr(-,root,root,-)
 %{_bindir}/cpan
 %{_prefix}/lib/perl5/%{perl_version}/CPAN/*
@@ -1208,6 +1218,7 @@ rm -rf $RPM_BUILD_ROOT
 %doc %{_mandir}/man3/CPAN:*
 
 %files CPANPLUS
+%manifest perl.manifest
 %defattr(-,root,root,-)
 %{_bindir}/cpan2dist
 %{_bindir}/cpanp
@@ -1219,6 +1230,7 @@ rm -rf $RPM_BUILD_ROOT
 %doc %{_mandir}/man3/CPANPLUS*
 
 %files Digest-SHA
+%manifest perl.manifest
 %defattr(-,root,root,-)
 %{_bindir}/shasum
 %dir %{_libdir}/perl5/%{version}/%{perl_archname}/Digest
@@ -1228,17 +1240,20 @@ rm -rf $RPM_BUILD_ROOT
 %doc %{_mandir}/man3/Digest::SHA.3*
 
 %files ExtUtils-CBuilder
+%manifest perl.manifest
 %defattr(-,root,root,-)
 %{_prefix}/lib/perl5/%{perl_version}/ExtUtils/CBuilder/*
 %{_prefix}/lib/perl5/%{perl_version}/ExtUtils/CBuilder.pm
 %doc %{_mandir}/man3/ExtUtils::CBuilder*
 
 %files ExtUtils-Embed
+%manifest perl.manifest
 %defattr(-,root,root,-)
 %{_prefix}/lib/perl5/%{perl_version}/ExtUtils/Embed.pm
 %doc %{_mandir}/man3/ExtUtils::Embed*
 
 %files ExtUtils-MakeMaker
+%manifest perl.manifest
 %defattr(-,root,root,-)
 %{_bindir}/instmodsh
 %{_prefix}/lib/perl5/%{perl_version}/ExtUtils/Command/*
@@ -1271,17 +1286,20 @@ rm -rf $RPM_BUILD_ROOT
 %doc %{_mandir}/man3/ExtUtils::testlib.3*
 
 %files ExtUtils-ParseXS
+%manifest perl.manifest
 %defattr(-,root,root,-)
 %{_prefix}/lib/perl5/%{perl_version}/ExtUtils/ParseXS.pm
 %{_prefix}/lib/perl5/%{perl_version}/ExtUtils/xsubpp
 %doc %{_mandir}/man3/ExtUtils::ParseXS.3*
 
 %files File-Fetch
+%manifest perl.manifest
 %defattr(-,root,root,-)
 %{_prefix}/lib/perl5/%{perl_version}/File/Fetch.pm
 %doc %{_mandir}/man3/File::Fetch.3*
 
 %files IO-Compress-Base
+%manifest perl.manifest
 %defattr(-,root,root,-)
 %{_libdir}/perl5/%{version}/File/GlobMapper.pm
 %{_libdir}/perl5/%{version}/IO/Compress/Base/*
@@ -1294,6 +1312,7 @@ rm -rf $RPM_BUILD_ROOT
 %doc %{_mandir}/man3/IO::Uncompress::Base.*
 
 %files IO-Compress-Zlib
+%manifest perl.manifest
 %defattr(-,root,root,-)
 %{_libdir}/perl5/%{version}/IO/Compress/Adapter/*
 %{_libdir}/perl5/%{version}/IO/Compress/Deflate.pm
@@ -1320,21 +1339,25 @@ rm -rf $RPM_BUILD_ROOT
 %doc %{_mandir}/man3/IO::Uncompress::Unzip*
 
 %files IO-Zlib
+%manifest perl.manifest
 %defattr(-,root,root,-)
 %{_prefix}/lib/perl5/%{perl_version}/IO/Zlib.pm
 %doc %{_mandir}/man3/IO::Zlib.*
 
 %files IPC-Cmd
+%manifest perl.manifest
 %defattr(-,root,root,-)
 %{_prefix}/lib/perl5/%{perl_version}/IPC/Cmd.pm
 %doc %{_mandir}/man3/IPC::Cmd.3*
 
 %files Locale-Maketext-Simple
+%manifest perl.manifest
 %defattr(-,root,root,-)
 %{_prefix}/lib/perl5/%{perl_version}/Locale/Maketext/Simple.pm
 %doc %{_mandir}/man3/Locale::Maketext::Simple.*
 
 %files Log-Message
+%manifest perl.manifest
 %defattr(-,root,root,-)
 %{_prefix}/lib/perl5/%{perl_version}/Log/Message.pm
 %{_prefix}/lib/perl5/%{perl_version}/Log/Message/Config.pm
@@ -1346,11 +1369,13 @@ rm -rf $RPM_BUILD_ROOT
 %doc %{_mandir}/man3/Log::Message::Item.3*
 
 %files Log-Message-Simple
+%manifest perl.manifest
 %defattr(-,root,root,-)
 %{_prefix}/lib/perl5/%{perl_version}/Log/Message/Simple.pm
 %doc %{_mandir}/man3/Log::Message::Simple.3*
 
 %files Module-Build
+%manifest perl.manifest
 %defattr(-,root,root,-)
 %{_bindir}/config_data
 %{_prefix}/lib/perl5/%{perl_version}/Module/Build/*
@@ -1359,6 +1384,7 @@ rm -rf $RPM_BUILD_ROOT
 %doc %{_mandir}/man3/Module::Build*
 
 %files Module-CoreList
+%manifest perl.manifest
 %defattr(-,root,root,-)
 %{_bindir}/corelist
 %{_prefix}/lib/perl5/%{perl_version}/Module/CoreList.pm
@@ -1366,22 +1392,26 @@ rm -rf $RPM_BUILD_ROOT
 %doc %{_mandir}/man3/Module::CoreList*
 
 %files Module-Load
+%manifest perl.manifest
 %defattr(-,root,root,-)
 %{_prefix}/lib/perl5/%{perl_version}/Module/Load.pm
 %doc %{_mandir}/man3/Module::Load.*
 
 %files Module-Load-Conditional
+%manifest perl.manifest
 %defattr(-,root,root,-)
 %{_prefix}/lib/perl5/%{perl_version}/Module/Load/*
 %doc %{_mandir}/man3/Module::Load::Conditional* 
 
 %files Module-Loaded
+%manifest perl.manifest
 %defattr(-,root,root,-)
 %dir %{_prefix}/lib/perl5/%{perl_version}/Module
 %{_prefix}/lib/perl5/%{perl_version}/Module/Loaded.pm
 %doc %{_mandir}/man3/Module::Loaded*
 
 %files Module-Pluggable
+%manifest perl.manifest
 %defattr(-,root,root,-)
 %{_prefix}/lib/perl5/%{perl_version}/Devel/InnerPackage.pm
 %{_prefix}/lib/perl5/%{perl_version}/Module/Pluggable/*
@@ -1390,26 +1420,31 @@ rm -rf $RPM_BUILD_ROOT
 %doc %{_mandir}/man3/Module::Pluggable*
 
 %files Object-Accessor
+%manifest perl.manifest
 %defattr(-,root,root,-)
 %{_prefix}/lib/perl5/%{perl_version}/Object/*
 %doc %{_mandir}/man3/Object::Accessor*
 
 %files Package-Constants
+%manifest perl.manifest
 %defattr(-,root,root,-)
 %{_prefix}/lib/perl5/%{perl_version}/Package/*
 %doc %{_mandir}/man3/Package::Constants*
 
 %files Params-Check
+%manifest perl.manifest
 %defattr(-,root,root,-)
 %{_prefix}/lib/perl5/%{perl_version}/Params/*
 %doc %{_mandir}/man3/Params::Check*
 
 %files Pod-Escapes
+%manifest perl.manifest
 %defattr(-,root,root,-)
 %{_prefix}/lib/perl5/%{perl_version}/Pod/Escapes.pm
 %doc %{_mandir}/man3/Pod::Escapes.*
 
 %files Pod-Simple
+%manifest perl.manifest
 %defattr(-,root,root,-)
 %{_prefix}/lib/perl5/%{perl_version}/Pod/Simple/*
 %{_prefix}/lib/perl5/%{perl_version}/Pod/Simple.pm
@@ -1417,12 +1452,14 @@ rm -rf $RPM_BUILD_ROOT
 %doc %{_mandir}/man3/Pod::Simple*
 
 %files Term-UI
+%manifest perl.manifest
 %defattr(-,root,root,-)
 %{_prefix}/lib/perl5/%{perl_version}/Term/UI/*
 %{_prefix}/lib/perl5/%{perl_version}/Term/UI.pm
 %doc %{_mandir}/man3/Term::UI*
 
 %files Test-Harness
+%manifest perl.manifest
 %defattr(-,root,root,-)
 %{_bindir}/prove
 %{_prefix}/lib/perl5/%{perl_version}/App*
@@ -1434,6 +1471,7 @@ rm -rf $RPM_BUILD_ROOT
 %{_mandir}/man3/Test::Harness*
 
 %files Test-Simple
+%manifest perl.manifest
 %defattr(-,root,root,-)
 %{_prefix}/lib/perl5/%{perl_version}/Test/More*
 %{_prefix}/lib/perl5/%{perl_version}/Test/Builder*
@@ -1445,6 +1483,7 @@ rm -rf $RPM_BUILD_ROOT
 %doc %{_mandir}/man3/Test::Tutorial*
 
 %files Time-Piece
+%manifest perl.manifest
 %defattr(-,root,root,-)
 %{_libdir}/perl5/%{version}/%{perl_archname}/Time/Piece.pm 
 %{_libdir}/perl5/%{version}/%{perl_archname}/Time/Seconds.pm
@@ -1453,12 +1492,14 @@ rm -rf $RPM_BUILD_ROOT
 %doc %{_mandir}/man3/Time::Seconds.3*
 
 %files version
+%manifest perl.manifest
 %defattr(-,root,root,-)
 %{_prefix}/lib/perl5/%{perl_version}/version.pm
 %{_prefix}/lib/perl5/%{perl_version}/version.pod
 %doc %{_mandir}/man3/version.*
 
 %files core
+%manifest perl.manifest
 # Nothing. Nada. Zilch. Zarro. Uh uh. Nope. Sorry.
 
 # Old changelog entries are preserved in CVS.
