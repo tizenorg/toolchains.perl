@@ -6,7 +6,7 @@ BEGIN {
 }
 
 require 'test.pl';
-plan( tests => 15 );
+plan( tests => 13 );
 
 @oops = @ops = <op/*>;
 
@@ -51,7 +51,15 @@ for (1..2) {
     undef %File::Glob::;
     ++$i;
 }
-cmp_ok($i,'==',2,'remore File::Glob stash');
+cmp_ok($i,'==',2,'remove File::Glob stash');
+
+# a more sinister version of the same test (crashes from 5.8 to 5.13.1)
+{
+    undef %File::Glob::;
+    local %CORE::GLOBAL::;
+    eval "<.>";
+    ok(!length($@),"remove File::Glob stash *and* CORE::GLOBAL::glob");
+}
 
 # ... while ($var = glob(...)) should test definedness not truth
 
@@ -73,10 +81,3 @@ SKIP: {
 }
 
 cmp_ok(scalar(@oops),'>',0,'glob globbed something');
-
-*aieee = 4;
-pass('Can assign integers to typeglobs');
-*aieee = 3.14;
-pass('Can assign floats to typeglobs');
-*aieee = 'pi';
-pass('Can assign strings to typeglobs');

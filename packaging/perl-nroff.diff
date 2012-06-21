@@ -1,0 +1,11 @@
+--- dist/Pod-Perldoc/lib/Pod/Perldoc.pm.orig	2010-02-17 14:35:24.000000000 +0000
++++ dist/Pod-Perldoc/lib/Pod/Perldoc.pm	2010-03-23 15:40:17.000000000 +0000
+@@ -655,7 +655,7 @@ sub options_processing {
+ 
+     $self->options_sanity;
+ 
+-    $self->opt_n("nroff") unless $self->opt_n;
++    $self->opt_n("nroff -c") unless $self->opt_n;
+     $self->add_formatter_option( '__nroffer' => $self->opt_n );
+ 
+     # Get language from PERLDOC_POD2 environment variable

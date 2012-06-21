@@ -7,7 +7,7 @@ use strict;
 
 # Package globals
 @ISA = ( 'DynaLoader' );
-$VERSION = '1.03';
+$VERSION = '1.05';
 my(%Locsyms) = ( ':ID' => 'LOCAL' );
 my(%Gblsyms) = ( ':ID' => 'GLOBAL');
 my $DoCache = 1;
@@ -18,6 +18,8 @@ my $Cache_set = 0;
 
 sub new {
   my($pkg,$type) = @_;
+  $type ||= 'LOCAL';
+  $type = 'LOCAL' unless $type eq 'GLOBAL';
   bless { TYPE => $type }, $pkg;
 }
 
@@ -73,7 +75,7 @@ sub clearcache {
 #====> TIEHASH methods
 
 sub TIEHASH {
-  $_[0]->new(@_);
+  shift->new(@_);
 }
 
 sub FETCH {
@@ -245,7 +247,7 @@ recorded, but in the rare event that someone changes the process' symbol table
 from outside (as is possible using some software from the net), the iterator
 will be out of sync with the symbol table.  If you expect this to happen, you
 can reset the cache by calling this method.  In addition, if you pass a FALSE
-value as the first argument, caching will be disabled.  It can be reenabled
+value as the first argument, caching will be disabled.  It can be re-enabled
 later by calling C<clearcache> again with a TRUE value as the first argument.
 It returns TRUE or FALSE to indicate whether caching was previously enabled or
 disabled, respectively.
@@ -262,7 +264,7 @@ Charles Bailey  bailey@newman.upenn.edu
 
 =head1 VERSION
 
-1.01  08-Dec-1996
+1.05  12-Feb-2011
 
 =head1 BUGS
 
