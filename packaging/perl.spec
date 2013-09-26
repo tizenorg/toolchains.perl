@@ -847,6 +847,9 @@ chmod -R u+w $RPM_BUILD_ROOT/*
 # Compress Changes* to save space
 %{__gzip} Changes*
 
+mkdir -p %{buildroot}/usr/share/license
+cp Copying %{buildroot}/usr/share/license/%{name}
+
 # Local patch tracking
 cd $RPM_BUILD_ROOT%{_libdir}/perl5/%{perl_version}/%{perl_archname}/CORE/
 perl -x patchlevel.h 'Fedora Patch1: Removes date check, Fedora/RHEL specific'
@@ -857,6 +860,7 @@ perl -x patchlevel.h 'Fedora Patch2: Work around annoying rpath issue'
 perl -x patchlevel.h 'Fedora Patch3: support for libdir64'
 %endif
 rm -rf $RPM_BUILD_ROOT/*.0
+
 
 %clean
 rm -rf $RPM_BUILD_ROOT
@@ -1148,6 +1152,8 @@ rm -rf $RPM_BUILD_ROOT
 %exclude %{_prefix}/lib/perl5/%{perl_version}/version.pm
 %exclude %{_prefix}/lib/perl5/%{perl_version}/version.pod
 %exclude %{_mandir}/man3/version.*
+
+/usr/share/license/%{name}
 
 %files libs
 %defattr(-,root,root)
