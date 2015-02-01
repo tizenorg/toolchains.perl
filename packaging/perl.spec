@@ -738,9 +738,9 @@ echo "RPM Build arch: %{_arch}"
         -Dprivlib="%{_prefix}/lib/perl5/%{perl_version}" \
         -Dsitelib="%{_prefix}/local/lib/perl5/site_perl/%{perl_version}" \
         -Dvendorlib="%{_prefix}/lib/perl5/vendor_perl/%{perl_version}" \
-        -Darchlib="%{_libdir}/perl5/%{perl_version}/%{perl_archname}" \
-        -Dsitearch="%{_prefix}/local/%{_lib}/perl5/site_perl/%{perl_version}/%{perl_archname}" \
-        -Dvendorarch="%{_libdir}/perl5/vendor_perl/%{perl_version}/%{perl_archname}" \
+        -Darchlib="%{_prefix}/lib/perl5/%{perl_version}/%{perl_archname}" \
+        -Dsitearch="%{_prefix}/local/lib/perl5/site_perl/%{perl_version}/%{perl_archname}" \
+        -Dvendorarch="%{_prefix}/lib/perl5/vendor_perl/%{perl_version}/%{perl_archname}" \
         -Dinc_version_list=none \
         -Darchname=%{perl_archname} \
 %ifarch %{multilib_64_archs}
@@ -777,8 +777,8 @@ echo "RPM Build arch: %{_arch}"
 
 ## delete this option, in 5.12.1 this will not be supported
 #        -Dd_dosuid \
-### make %{?_smp_mflags}
-make
+make %{?_smp_mflags}
+#make
 
 
 %install
@@ -787,7 +787,7 @@ make install DESTDIR=$RPM_BUILD_ROOT
 
 %define new_perl_lib  $RPM_BUILD_ROOT%{_libdir}/perl5/%{version}
 %define comp_perl_lib $RPM_BUILD_ROOT%{_prefix}/lib/perl5/%{version}
-%define new_arch_lib  $RPM_BUILD_ROOT%{_libdir}/perl5/%{version}/%{perl_archname}
+%define new_arch_lib  $RPM_BUILD_ROOT%{_prefix}/lib/perl5/%{version}/%{perl_archname}
 %define new_vendor_lib $RPM_BUILD_ROOT%{_libdir}/perl5/vendor_perl/%{version}
 %define comp_vendor_lib $RPM_BUILD_ROOT%{_prefix}/lib/perl5/vendor_perl/%{version}
 %define new_perl_flags LD_PRELOAD=%{new_arch_lib}/CORE/libperl.so LD_LIBRARY_PATH=%{new_arch_lib}/CORE PERL5LIB=%{new_perl_lib}:%{comp_perl_lib}
@@ -848,7 +848,7 @@ chmod -R u+w $RPM_BUILD_ROOT/*
 %{__gzip} Changes*
 
 # Local patch tracking
-cd $RPM_BUILD_ROOT%{_libdir}/perl5/%{perl_version}/%{perl_archname}/CORE/
+cd $RPM_BUILD_ROOT%{_prefix}/lib/perl5/%{perl_version}/%{perl_archname}/CORE/
 perl -x patchlevel.h 'Fedora Patch1: Removes date check, Fedora/RHEL specific'
 %ifnarch sparc64
 perl -x patchlevel.h 'Fedora Patch2: Work around annoying rpath issue'
@@ -857,6 +857,9 @@ perl -x patchlevel.h 'Fedora Patch2: Work around annoying rpath issue'
 perl -x patchlevel.h 'Fedora Patch3: support for libdir64'
 %endif
 rm -rf $RPM_BUILD_ROOT/*.0
+
+mkdir -p $RPM_BUILD_ROOT%{_prefix}/lib/perl5/vendor_perl/%{perl_version}/%{perl_archname}
+touch $RPM_BUILD_ROOT%{_prefix}/lib/perl5/vendor_perl/%{perl_version}/%{perl_archname}/.dummy
 
 %clean
 rm -rf $RPM_BUILD_ROOT
@@ -882,7 +885,7 @@ rm -rf $RPM_BUILD_ROOT
 %endif
 
 # libs
-%exclude %{_libdir}/perl5/%{perl_version}/%{perl_archname}/CORE/libperl.so
+%exclude %{_prefix}/lib/perl5/%{perl_version}/%{perl_archname}/CORE/libperl.so
 
 # devel
 %exclude %{_bindir}/enc2xs
@@ -894,7 +897,7 @@ rm -rf $RPM_BUILD_ROOT
 %exclude %{_mandir}/man1/libnetcfg*
 %exclude %{_bindir}/perlivp
 %exclude %{_mandir}/man1/perlivp*
-%exclude %{_libdir}/perl5/%{perl_version}/%{perl_archname}/CORE/*.h
+%exclude %{_prefix}/lib/perl5/%{perl_version}/%{perl_archname}/CORE/*.h
 %exclude %{_bindir}/xsubpp
 %exclude %{_mandir}/man1/xsubpp*
 
@@ -930,21 +933,21 @@ rm -rf $RPM_BUILD_ROOT
 %exclude %{_mandir}/man3/CPANPLUS*
 
 # Compress::Raw::Zlib
-%exclude %{_libdir}/perl5/%{version}/%{perl_archname}/Compress
-%exclude %{_libdir}/perl5/%{version}/%{perl_archname}/Compress/Raw/*
-%exclude %{_libdir}/perl5/%{version}/%{perl_archname}/auto/Compress
-%exclude %{_libdir}/perl5/%{version}/%{perl_archname}/auto/Compress/Raw/*
+%exclude %{_prefix}/lib/perl5/%{version}/%{perl_archname}/Compress
+%exclude %{_prefix}/lib/perl5/%{version}/%{perl_archname}/Compress/Raw/*
+%exclude %{_prefix}/lib/perl5/%{version}/%{perl_archname}/auto/Compress
+%exclude %{_prefix}/lib/perl5/%{version}/%{perl_archname}/auto/Compress/Raw/*
 %exclude %{_mandir}/man3/Compress::Raw::Zlib*
 
 # Compress::Zlib
-%exclude %{_libdir}/perl5/%{version}/Compress/Zlib.pm
-%exclude %{_libdir}/perl5/%{version}/%{perl_archname}/auto/Compress/Zlib/*
+%exclude %{_prefix}/lib/perl5/%{perl_version}/Compress/Zlib.pm
+%exclude %{_prefix}/lib/perl5/%{version}/%{perl_archname}/auto/Compress/Zlib/*
 %exclude %{_mandir}/man3/Compress::Zlib*
 
 # Digest::SHA
 %exclude %{_bindir}/shasum
-%exclude %{_libdir}/perl5/%{version}/%{perl_archname}/Digest/SHA.pm
-%exclude %{_libdir}/perl5/%{version}/%{perl_archname}/auto/Digest/SHA/*
+%exclude %{_prefix}/lib/perl5/%{version}/%{perl_archname}/Digest/SHA.pm
+%exclude %{_prefix}/lib/perl5/%{version}/%{perl_archname}/auto/Digest/SHA/*
 %exclude %{_mandir}/man1/shasum.1*
 %exclude %{_mandir}/man3/Digest::SHA.3*
 
@@ -998,30 +1001,30 @@ rm -rf $RPM_BUILD_ROOT
 %exclude %{_mandir}/man3/File::Fetch.3*
 
 # IO::Compress::Base
-%exclude %{_libdir}/perl5/%{version}/File/GlobMapper.pm
-%exclude %{_libdir}/perl5/%{version}/IO/Compress/Base/*
-%exclude %{_libdir}/perl5/%{version}/IO/Compress/Base.pm
-%exclude %{_libdir}/perl5/%{version}/IO/Uncompress/AnyUncompress.pm
-%exclude %{_libdir}/perl5/%{version}/IO/Uncompress/Base.pm
+%exclude %{_prefix}/lib/perl5/%{perl_version}/File/GlobMapper.pm
+%exclude %{_prefix}/lib/perl5/%{perl_version}/IO/Compress/Base/*
+%exclude %{_prefix}/lib/perl5/%{perl_version}/IO/Compress/Base.pm
+%exclude %{_prefix}/lib/perl5/%{perl_version}/IO/Uncompress/AnyUncompress.pm
+%exclude %{_prefix}/lib/perl5/%{perl_version}/IO/Uncompress/Base.pm
 %exclude %{_mandir}/man3/File::GlobMapper.*
 %exclude %{_mandir}/man3/IO::Compress::Base.*
 %exclude %{_mandir}/man3/IO::Uncompress::AnyUncompress.*
 %exclude %{_mandir}/man3/IO::Uncompress::Base.*
 
-%exclude %{_libdir}/perl5/%{version}/IO/Compress/Adapter/*
-%exclude %{_libdir}/perl5/%{version}/IO/Compress/Deflate.pm
-%exclude %{_libdir}/perl5/%{version}/IO/Compress/Gzip/*
-%exclude %{_libdir}/perl5/%{version}/IO/Compress/Gzip.pm
-%exclude %{_libdir}/perl5/%{version}/IO/Compress/RawDeflate.pm
-%exclude %{_libdir}/perl5/%{version}/IO/Compress/Zip/*
-%exclude %{_libdir}/perl5/%{version}/IO/Compress/Zip.pm
-%exclude %{_libdir}/perl5/%{version}/IO/Compress/Zlib/*
-%exclude %{_libdir}/perl5/%{version}/IO/Uncompress/Adapter/*
-%exclude %{_libdir}/perl5/%{version}/IO/Uncompress/AnyInflate.pm
-%exclude %{_libdir}/perl5/%{version}/IO/Uncompress/Gunzip.pm
-%exclude %{_libdir}/perl5/%{version}/IO/Uncompress/Inflate.pm
-%exclude %{_libdir}/perl5/%{version}/IO/Uncompress/RawInflate.pm
-%exclude %{_libdir}/perl5/%{version}/IO/Uncompress/Unzip.pm
+%exclude %{_prefix}/lib/perl5/%{perl_version}/IO/Compress/Adapter/*
+%exclude %{_prefix}/lib/perl5/%{perl_version}/IO/Compress/Deflate.pm
+%exclude %{_prefix}/lib/perl5/%{perl_version}/IO/Compress/Gzip/*
+%exclude %{_prefix}/lib/perl5/%{perl_version}/IO/Compress/Gzip.pm
+%exclude %{_prefix}/lib/perl5/%{perl_version}/IO/Compress/RawDeflate.pm
+%exclude %{_prefix}/lib/perl5/%{perl_version}/IO/Compress/Zip/*
+%exclude %{_prefix}/lib/perl5/%{perl_version}/IO/Compress/Zip.pm
+%exclude %{_prefix}/lib/perl5/%{perl_version}/IO/Compress/Zlib/*
+%exclude %{_prefix}/lib/perl5/%{perl_version}/IO/Uncompress/Adapter/*
+%exclude %{_prefix}/lib/perl5/%{perl_version}/IO/Uncompress/AnyInflate.pm
+%exclude %{_prefix}/lib/perl5/%{perl_version}/IO/Uncompress/Gunzip.pm
+%exclude %{_prefix}/lib/perl5/%{perl_version}/IO/Uncompress/Inflate.pm
+%exclude %{_prefix}/lib/perl5/%{perl_version}/IO/Uncompress/RawInflate.pm
+%exclude %{_prefix}/lib/perl5/%{perl_version}/IO/Uncompress/Unzip.pm
 %exclude %{_mandir}/man3/IO::Compress::Deflate*
 %exclude %{_mandir}/man3/IO::Compress::Gzip*
 %exclude %{_mandir}/man3/IO::Compress::RawDeflate*
@@ -1138,9 +1141,9 @@ rm -rf $RPM_BUILD_ROOT
 %exclude %{_mandir}/man3/Test::Tutorial*
 
 # Time::Piece
-%exclude %{_libdir}/perl5/%{version}/%{perl_archname}/Time/Piece.pm
-%exclude %{_libdir}/perl5/%{version}/%{perl_archname}/Time/Seconds.pm
-%exclude %{_libdir}/perl5/%{version}/%{perl_archname}/auto/Time/Piece/*
+%exclude %{_prefix}/lib/perl5/%{version}/%{perl_archname}/Time/Piece.pm
+%exclude %{_prefix}/lib/perl5/%{version}/%{perl_archname}/Time/Seconds.pm
+%exclude %{_prefix}/lib/perl5/%{version}/%{perl_archname}/auto/Time/Piece/*
 %exclude %{_mandir}/man3/Time::Piece.3*
 %exclude %{_mandir}/man3/Time::Seconds.3*
 
@@ -1151,7 +1154,7 @@ rm -rf $RPM_BUILD_ROOT
 
 %files libs
 %defattr(-,root,root)
-%{_libdir}/perl5/%{perl_version}/%{perl_archname}/CORE/libperl.so
+%{_prefix}/lib/perl5/%{perl_version}/%{perl_archname}/CORE/libperl.so
 
 %files devel
 %defattr(-,root,root,-)
@@ -1165,7 +1168,7 @@ rm -rf $RPM_BUILD_ROOT
 %doc %{_mandir}/man1/libnetcfg*
 %{_bindir}/perlivp
 %doc %{_mandir}/man1/perlivp*
-%{_libdir}/perl5/%{perl_version}/%{perl_archname}/CORE/*.h
+%{_prefix}/lib/perl5/%{perl_version}/%{perl_archname}/CORE/*.h
 %{_bindir}/xsubpp
 %doc %{_mandir}/man1/xsubpp*
 %attr(0644,root,root) %{_sysconfdir}/rpm/macros.perl
@@ -1187,16 +1190,16 @@ rm -rf $RPM_BUILD_ROOT
 
 %files Compress-Raw-Zlib
 %defattr(-,root,root,-)
-%dir %{_libdir}/perl5/%{version}/%{perl_archname}/Compress
-%{_libdir}/perl5/%{version}/%{perl_archname}/Compress/Raw/*
-%dir %{_libdir}/perl5/%{version}/%{perl_archname}/auto/Compress
-%{_libdir}/perl5/%{version}/%{perl_archname}/auto/Compress/Raw/*
+%dir %{_prefix}/lib/perl5/%{version}/%{perl_archname}/Compress
+%{_prefix}/lib/perl5/%{version}/%{perl_archname}/Compress/Raw/*
+%dir %{_prefix}/lib/perl5/%{version}/%{perl_archname}/auto/Compress
+%{_prefix}/lib/perl5/%{version}/%{perl_archname}/auto/Compress/Raw/*
 %doc %{_mandir}/man3/Compress::Raw::Zlib*
 
 %files Compress-Zlib
 %defattr(-,root,root,-)
-%{_libdir}/perl5/%{version}/Compress/Zlib.pm
-%{_libdir}/perl5/%{version}/%{perl_archname}/auto/Compress/Zlib/*
+%{_prefix}/lib/perl5/%{perl_version}/Compress/Zlib.pm
+%{_prefix}/lib/perl5/%{version}/%{perl_archname}/auto/Compress/Zlib/*
 %doc %{_mandir}/man3/Compress::Zlib*
 
 %files CPAN
@@ -1222,9 +1225,9 @@ rm -rf $RPM_BUILD_ROOT
 %files Digest-SHA
 %defattr(-,root,root,-)
 %{_bindir}/shasum
-%dir %{_libdir}/perl5/%{version}/%{perl_archname}/Digest
-%{_libdir}/perl5/%{version}/%{perl_archname}/Digest/SHA.pm
-%{_libdir}/perl5/%{version}/%{perl_archname}/auto/Digest/SHA/*
+%dir %{_prefix}/lib/perl5/%{version}/%{perl_archname}/Digest
+%{_prefix}/lib/perl5/%{version}/%{perl_archname}/Digest/SHA.pm
+%{_prefix}/lib/perl5/%{version}/%{perl_archname}/auto/Digest/SHA/*
 %doc %{_mandir}/man1/shasum.1*
 %doc %{_mandir}/man3/Digest::SHA.3*
 
@@ -1284,11 +1287,11 @@ rm -rf $RPM_BUILD_ROOT
 
 %files IO-Compress-Base
 %defattr(-,root,root,-)
-%{_libdir}/perl5/%{version}/File/GlobMapper.pm
-%{_libdir}/perl5/%{version}/IO/Compress/Base/*
-%{_libdir}/perl5/%{version}/IO/Compress/Base.pm
-%{_libdir}/perl5/%{version}/IO/Uncompress/AnyUncompress.pm
-%{_libdir}/perl5/%{version}/IO/Uncompress/Base.pm
+%{_prefix}/lib/perl5/%{perl_version}/File/GlobMapper.pm
+%{_prefix}/lib/perl5/%{perl_version}/IO/Compress/Base/*
+%{_prefix}/lib/perl5/%{perl_version}/IO/Compress/Base.pm
+%{_prefix}/lib/perl5/%{perl_version}/IO/Uncompress/AnyUncompress.pm
+%{_prefix}/lib/perl5/%{perl_version}/IO/Uncompress/Base.pm
 %doc %{_mandir}/man3/File::GlobMapper.*
 %doc %{_mandir}/man3/IO::Compress::Base.*
 %doc %{_mandir}/man3/IO::Uncompress::AnyUncompress.*
@@ -1296,20 +1299,20 @@ rm -rf $RPM_BUILD_ROOT
 
 %files IO-Compress-Zlib
 %defattr(-,root,root,-)
-%{_libdir}/perl5/%{version}/IO/Compress/Adapter/*
-%{_libdir}/perl5/%{version}/IO/Compress/Deflate.pm
-%{_libdir}/perl5/%{version}/IO/Compress/Gzip/*
-%{_libdir}/perl5/%{version}/IO/Compress/Gzip.pm
-%{_libdir}/perl5/%{version}/IO/Compress/RawDeflate.pm
-%{_libdir}/perl5/%{version}/IO/Compress/Zip/*
-%{_libdir}/perl5/%{version}/IO/Compress/Zip.pm
-%{_libdir}/perl5/%{version}/IO/Compress/Zlib/*
-%{_libdir}/perl5/%{version}/IO/Uncompress/Adapter/*
-%{_libdir}/perl5/%{version}/IO/Uncompress/AnyInflate.pm
-%{_libdir}/perl5/%{version}/IO/Uncompress/Gunzip.pm
-%{_libdir}/perl5/%{version}/IO/Uncompress/Inflate.pm
-%{_libdir}/perl5/%{version}/IO/Uncompress/RawInflate.pm
-%{_libdir}/perl5/%{version}/IO/Uncompress/Unzip.pm
+%{_prefix}/lib/perl5/%{perl_version}/IO/Compress/Adapter/*
+%{_prefix}/lib/perl5/%{perl_version}/IO/Compress/Deflate.pm
+%{_prefix}/lib/perl5/%{perl_version}/IO/Compress/Gzip/*
+%{_prefix}/lib/perl5/%{perl_version}/IO/Compress/Gzip.pm
+%{_prefix}/lib/perl5/%{perl_version}/IO/Compress/RawDeflate.pm
+%{_prefix}/lib/perl5/%{perl_version}/IO/Compress/Zip/*
+%{_prefix}/lib/perl5/%{perl_version}/IO/Compress/Zip.pm
+%{_prefix}/lib/perl5/%{perl_version}/IO/Compress/Zlib/*
+%{_prefix}/lib/perl5/%{perl_version}/IO/Uncompress/Adapter/*
+%{_prefix}/lib/perl5/%{perl_version}/IO/Uncompress/AnyInflate.pm
+%{_prefix}/lib/perl5/%{perl_version}/IO/Uncompress/Gunzip.pm
+%{_prefix}/lib/perl5/%{perl_version}/IO/Uncompress/Inflate.pm
+%{_prefix}/lib/perl5/%{perl_version}/IO/Uncompress/RawInflate.pm
+%{_prefix}/lib/perl5/%{perl_version}/IO/Uncompress/Unzip.pm
 %doc %{_mandir}/man3/IO::Compress::Deflate*
 %doc %{_mandir}/man3/IO::Compress::Gzip*
 %doc %{_mandir}/man3/IO::Compress::RawDeflate*
@@ -1447,9 +1450,9 @@ rm -rf $RPM_BUILD_ROOT
 
 %files Time-Piece
 %defattr(-,root,root,-)
-%{_libdir}/perl5/%{version}/%{perl_archname}/Time/Piece.pm 
-%{_libdir}/perl5/%{version}/%{perl_archname}/Time/Seconds.pm
-%{_libdir}/perl5/%{version}/%{perl_archname}/auto/Time/Piece/        
+%{_prefix}/lib/perl5/%{version}/%{perl_archname}/Time/Piece.pm 
+%{_prefix}/lib/perl5/%{version}/%{perl_archname}/Time/Seconds.pm
+%{_prefix}/lib/perl5/%{version}/%{perl_archname}/auto/Time/Piece/        
 %doc %{_mandir}/man3/Time::Piece.3*
 %doc %{_mandir}/man3/Time::Seconds.3*
 
