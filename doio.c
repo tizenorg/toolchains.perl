@@ -214,8 +214,7 @@ Perl_do_openn(pTHX_ GV *gv, register const char *oname, I32 len, int as_raw,
 		goto say_false;
 	    }
 #endif /* USE_STDIO */
-	    name = (SvOK(*svp) || SvGMAGICAL(*svp)) ?
-			savesvpv (*svp) : savepvs ("");
+	    name = SvOK(*svp) ? savesvpv (*svp) : savepvs ("");
 	    SAVEFREEPV(name);
 	}
 	else {
@@ -929,7 +928,8 @@ Perl_do_close(pTHX_ GV *gv, bool not_implicit)
     io = GvIO(gv);
     if (!io) {		/* never opened */
 	if (not_implicit) {
-	    report_evil_fh(gv);
+	    if (ckWARN(WARN_UNOPENED)) /* no check for closed here */
+		report_evil_fh(gv, io, PL_op->op_type);
 	    SETERRNO(EBADF,SS_IVCHAN);
 	}
 	return FALSE;
@@ -995,8 +995,8 @@ Perl_do_eof(pTHX_ GV *gv)
 
     if (!io)
 	return TRUE;
-    else if (IoTYPE(io) == IoTYPE_WRONLY)
-	report_wrongway_fh(gv, '>');
+    else if ((IoTYPE(io) == IoTYPE_WRONLY) && ckWARN(WARN_IO))
+	report_evil_fh(gv, io, OP_phoney_OUTPUT_ONLY);
 
     while (IoIFP(io)) {
         if (PerlIO_has_cntptr(IoIFP(io))) {	/* (the code works without this) */
@@ -1034,19 +1034,20 @@ Off_t
 Perl_do_tell(pTHX_ GV *gv)
 {
     dVAR;
-    IO *const io = GvIO(gv);
+    register IO *io = NULL;
     register PerlIO *fp;
 
     PERL_ARGS_ASSERT_DO_TELL;
 
-    if (io && (fp = IoIFP(io))) {
+    if (gv && (io = GvIO(gv)) && (fp = IoIFP(io))) {
 #ifdef ULTRIX_STDIO_BOTCH
 	if (PerlIO_eof(fp))
 	    (void)PerlIO_seek(fp, 0L, 2);	/* ultrix 1.2 workaround */
 #endif
 	return PerlIO_tell(fp);
     }
-    report_evil_fh(gv);
+    if (ckWARN2(WARN_UNOPENED,WARN_CLOSED))
+	report_evil_fh(gv, io, PL_op->op_type);
     SETERRNO(EBADF,RMS_IFI);
     return (Off_t)-1;
 }
@@ -1055,17 +1056,18 @@ bool
 Perl_do_seek(pTHX_ GV *gv, Off_t pos, int whence)
 {
     dVAR;
-    IO *const io = GvIO(gv);
+    register IO *io = NULL;
     register PerlIO *fp;
 
-    if (io && (fp = IoIFP(io))) {
+    if (gv && (io = GvIO(gv)) && (fp = IoIFP(io))) {
 #ifdef ULTRIX_STDIO_BOTCH
 	if (PerlIO_eof(fp))
 	    (void)PerlIO_seek(fp, 0L, 2);	/* ultrix 1.2 workaround */
 #endif
 	return PerlIO_seek(fp, pos, whence) >= 0;
     }
-    report_evil_fh(gv);
+    if (ckWARN2(WARN_UNOPENED,WARN_CLOSED))
+	report_evil_fh(gv, io, PL_op->op_type);
     SETERRNO(EBADF,RMS_IFI);
     return FALSE;
 }
@@ -1074,14 +1076,15 @@ Off_t
 Perl_do_sysseek(pTHX_ GV *gv, Off_t pos, int whence)
 {
     dVAR;
-    IO *const io = GvIO(gv);
+    register IO *io = NULL;
     register PerlIO *fp;
 
     PERL_ARGS_ASSERT_DO_SYSSEEK;
 
-    if (io && (fp = IoIFP(io)))
+    if (gv && (io = GvIO(gv)) && (fp = IoIFP(io)))
 	return PerlLIO_lseek(PerlIO_fileno(fp), pos, whence);
-    report_evil_fh(gv);
+    if (ckWARN2(WARN_UNOPENED,WARN_CLOSED))
+	report_evil_fh(gv, io, PL_op->op_type);
     SETERRNO(EBADF,RMS_IFI);
     return (Off_t)-1;
 }
@@ -1224,9 +1227,6 @@ Perl_do_print(pTHX_ register SV *sv, PerlIO *fp)
 		tmpbuf = bytes_to_utf8((const U8*) tmps, &len);
 		tmps = (char *) tmpbuf;
 	    }
-	    else if (ckWARN_d(WARN_UTF8)) {
-		(void) check_utf8_print((const U8*) tmps, len);
-	    }
 	}
 	else if (DO_UTF8(sv)) {
 	    STRLEN tmplen = len;
@@ -1240,12 +1240,7 @@ Perl_do_print(pTHX_ register SV *sv, PerlIO *fp)
 	    else {
 		assert((char *)result == tmps);
 		Perl_ck_warner_d(aTHX_ packWARN(WARN_UTF8),
-				 "Wide character in %s",
-				   PL_op ? OP_DESC(PL_op) : "print"
-				);
-		    /* Could also check that isn't one of the things to avoid
-		     * in utf8 by using check_utf8_print(), but not doing so,
-		     * since the stream isn't a UTF8 stream */
+				 "Wide character in print");
 	    }
 	}
 	/* To detect whether the process is about to overstep its
@@ -1262,7 +1257,7 @@ Perl_do_print(pTHX_ register SV *sv, PerlIO *fp)
 }
 
 I32
-Perl_my_stat_flags(pTHX_ const U32 flags)
+Perl_my_stat(pTHX)
 {
     dVAR;
     dSP;
@@ -1286,11 +1281,13 @@ Perl_my_stat_flags(pTHX_ const U32 flags)
             } else if (IoDIRP(io)) {
                 return (PL_laststatval = PerlLIO_fstat(my_dirfd(IoDIRP(io)), &PL_statcache));
             } else {
-		report_evil_fh(gv);
+                if (ckWARN2(WARN_UNOPENED,WARN_CLOSED))
+                    report_evil_fh(gv, io, PL_op->op_type);
                 return (PL_laststatval = -1);
             }
 	} else {
-	    report_evil_fh(gv);
+            if (ckWARN2(WARN_UNOPENED,WARN_CLOSED))
+                report_evil_fh(gv, io, PL_op->op_type);
             return (PL_laststatval = -1);
         }
     }
@@ -1316,7 +1313,7 @@ Perl_my_stat_flags(pTHX_ const U32 flags)
             goto do_fstat_have_io;
         }
 
-	s = SvPV_flags_const(sv, len, flags);
+	s = SvPV_const(sv, len);
 	PL_statgv = NULL;
 	sv_setpvn(PL_statname, s, len);
 	s = SvPVX_const(PL_statname);		/* s now NUL-terminated */
@@ -1330,7 +1327,7 @@ Perl_my_stat_flags(pTHX_ const U32 flags)
 
 
 I32
-Perl_my_lstat_flags(pTHX_ const U32 flags)
+Perl_my_lstat(pTHX)
 {
     dVAR;
     static const char no_prev_lstat[] = "The stat preceding -l _ wasn't an lstat";
@@ -1363,7 +1360,7 @@ Perl_my_lstat_flags(pTHX_ const U32 flags)
 		GvENAME((const GV *)SvRV(sv)));
 	return (PL_laststatval = -1);
     }
-    file = SvPV_flags_const_nolen(sv, flags);
+    file = SvPV_nolen_const(sv);
     sv_setpv(PL_statname,file);
     PL_laststatval = PerlLIO_lstat(file,&PL_statcache);
     if (PL_laststatval < 0 && ckWARN(WARN_NEWLINE) && strchr(file, '\n'))
@@ -1723,10 +1720,9 @@ nothing in the core.
 	    while (++mark <= sp) {
 		I32 proc;
 		register unsigned long int __vmssts;
-		SvGETMAGIC(*mark);
 		if (!(SvIOK(*mark) || SvNOK(*mark) || looks_like_number(*mark)))
 		    Perl_croak(aTHX_ "Can't kill a non-numeric process ID");
-		proc = SvIV_nomg(*mark);
+		proc = SvIV(*mark);
 		APPLY_TAINT_PROPER();
 		if (!((__vmssts = sys$delprc(&proc,0)) & 1)) {
 		    tot--;
@@ -1743,7 +1739,6 @@ nothing in the core.
 		    }
 		}
 	    }
-	    PERL_ASYNC_CHECK();
 	    break;
 	}
 #endif
@@ -1751,10 +1746,9 @@ nothing in the core.
 	    val = -val;
 	    while (++mark <= sp) {
 		I32 proc;
-		SvGETMAGIC(*mark);
 		if (!(SvIOK(*mark) || SvNOK(*mark) || looks_like_number(*mark)))
 		    Perl_croak(aTHX_ "Can't kill a non-numeric process ID");
-		proc = SvIV_nomg(*mark);
+		proc = SvIV(*mark);
 		APPLY_TAINT_PROPER();
 #ifdef HAS_KILLPG
 		if (PerlProc_killpg(proc,val))	/* BSD */
@@ -1767,16 +1761,14 @@ nothing in the core.
 	else {
 	    while (++mark <= sp) {
 		I32 proc;
-		SvGETMAGIC(*mark);
 		if (!(SvIOK(*mark) || SvNOK(*mark) || looks_like_number(*mark)))
 		    Perl_croak(aTHX_ "Can't kill a non-numeric process ID");
-		proc = SvIV_nomg(*mark);
+		proc = SvIV(*mark);
 		APPLY_TAINT_PROPER();
 		if (PerlProc_kill(proc, val))
 		    tot--;
 	    }
 	}
-	PERL_ASYNC_CHECK();
 	break;
 #endif
     case OP_UNLINK:
@@ -1905,7 +1897,7 @@ Perl_cando(pTHX_ Mode_t mode, bool effective, register const Stat_t *statbufp)
     /* [Comments and code from Len Reed]
      * MS-DOS "user" is similar to UNIX's "superuser," but can't write
      * to write-protected files.  The execute permission bit is set
-     * by the Microsoft C library stat() function for the following:
+     * by the Miscrosoft C library stat() function for the following:
      *		.exe files
      *		.com files
      *		.bat files

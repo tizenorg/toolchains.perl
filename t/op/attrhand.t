@@ -1,10 +1,13 @@
 #!/usr/bin/perl -w
 
 BEGIN {
+    if ($ENV{PERL_CORE_MINITEST}) {
+	print "1..0 # skip: miniperl can't load attributes\n";
+	exit 0;
+    }
     chdir 't' if -d 't';
     @INC = '../lib';
     require './test.pl';
-    skip_all_if_miniperl("miniperl can't load attributes");
 }
 
 plan tests => 4;

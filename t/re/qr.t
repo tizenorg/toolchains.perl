@@ -72,7 +72,7 @@ for($'){
  is $output, "5\n1: 5\n2: 5\n", q|/$qr/ with $'_ aliased to a match var|;
 }
 
-# Make sure /$qr/ calls get-magic on its LHS (bug 71470).
+# Make sure /$qr/ calls get-magic on its LHS (bug ~~~~~).
 {
  my $scratch;
  sub qrBug::TIESCALAR{bless[], 'qrBug'}

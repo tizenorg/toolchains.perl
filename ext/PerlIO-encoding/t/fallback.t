@@ -1,6 +1,8 @@
 #!./perl
 
 BEGIN {
+    push @INC, "::lib:$MacPerl::Architecture:" if $^O eq 'MacOS';
+    require "../../t/test.pl";
     skip_all("No perlio") unless (find PerlIO::Layer 'perlio');
     if (ord("A") == 193) {
 	print "1..0 # Skip: EBCDIC\n";
@@ -10,7 +12,7 @@ BEGIN {
 	print "1..0 # Skip: No Encode\n";
 	exit 0;
     }
-    use Test::More tests => 9;
+    plan (9);
     import Encode qw(:fallback_all);
 }
 

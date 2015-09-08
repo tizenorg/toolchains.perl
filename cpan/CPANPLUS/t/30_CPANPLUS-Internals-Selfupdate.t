@@ -75,7 +75,7 @@ my $Prereq      = { $Dep => 0 };
     }
 
     is_deeply( $Conf, $Class->_get_config,
-                                "Config updated successfully" );
+                                "Config updated succesfully" );
 
     my @cat  = $CB->$Acc->list_categories;
     ok( scalar(@cat),           "Category list returned" );

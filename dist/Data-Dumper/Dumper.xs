@@ -142,14 +142,10 @@ esc_q_utf8(pTHX_ SV* sv, register const char *src, register STRLEN slen)
     STRLEN single_quotes = 0;
     STRLEN qq_escapables = 0;	/* " $ @ will need a \ in "" strings.  */
     STRLEN normal = 0;
-    int increment;
 
     /* this will need EBCDICification */
-    for (s = src; s < send; s += increment) {
+    for (s = src; s < send; s += UTF8SKIP(s)) {
         const UV k = utf8_to_uvchr((U8*)s, NULL);
-
-        /* check for invalid utf8 */
-        increment = (k == 0 && *s != '\0') ? 1 : UTF8SKIP(s);
 
 #ifdef EBCDIC
 	if (!isprint(k) || k > 256) {
@@ -293,7 +289,7 @@ DD_dump(pTHX_ SV *val, const char *name, STRLEN namelen, SV *retval, HV *seenhv,
     if (!val)
 	return 0;
 
-    /* If the ouput buffer has less than some arbitrary amount of space
+    /* If the ouput buffer has less than some arbitary amount of space
        remaining, then enlarge it. For the test case (25M of output),
        *1.1 was slower, *2.0 was the same, so the first guess of 1.5 is
 	deemed to be good enough.  */
@@ -706,7 +702,7 @@ DD_dump(pTHX_ SV *val, const char *name, STRLEN namelen, SV *retval, HV *seenhv,
 		    keysv = svp ? *svp : sv_mortalcopy(&PL_sv_undef);
 		    key = SvPV(keysv, keylen);
 		    svp = hv_fetch((HV*)ival, key,
-                                   SvUTF8(keysv) ? -(I32)keylen : (I32)keylen, 0);
+                                   SvUTF8(keysv) ? -(I32)keylen : keylen, 0);
 		    hval = svp ? *svp : sv_mortalcopy(&PL_sv_undef);
 		}
 		else {
@@ -913,7 +909,7 @@ DD_dump(pTHX_ SV *val, const char *name, STRLEN namelen, SV *retval, HV *seenhv,
 	}
 	else if (realtype == SVt_PVGV) {/* GLOBs can end up with scribbly names */
 	    c = SvPV(val, i);
-	    if(i) ++c, --i;			/* just get the name */
+	    ++c; --i;			/* just get the name */
 	    if (i >= 6 && strncmp(c, "main::", 6) == 0) {
 		c += 4;
 		i -= 4;
@@ -1016,7 +1012,7 @@ MODULE = Data::Dumper		PACKAGE = Data::Dumper         PREFIX = Data_Dumper_
 #
 # This is the exact equivalent of Dump.  Well, almost. The things that are
 # different as of now (due to Laziness):
-#   * doesn't do double-quotes yet.
+#   * doesnt do double-quotes yet.
 #
 
 void
@@ -1183,7 +1179,7 @@ Data_Dumper_Dumpxs(href, ...)
 			sv_catpvn(name, tmpbuf, nchars);
 		    }
 		
-		    if (indent >= 2 && !terse) {
+		    if (indent >= 2) {
 			SV * const tmpsv = sv_x(aTHX_ NULL, " ", 1, SvCUR(name)+3);
 			newapad = newSVsv(apad);
 			sv_catsv(newapad, tmpsv);
@@ -1192,14 +1188,12 @@ Data_Dumper_Dumpxs(href, ...)
 		    else
 			newapad = apad;
 		
-		    PUTBACK;
 		    DD_dump(aTHX_ val, SvPVX_const(name), SvCUR(name), valstr, seenhv,
 			    postav, &level, indent, pad, xpad, newapad, sep, pair,
 			    freezer, toaster, purity, deepcopy, quotekeys,
 			    bless, maxdepth, sortkeys);
-		    SPAGAIN;
 		
-		    if (indent >= 2 && !terse)
+		    if (indent >= 2)
 			SvREFCNT_dec(newapad);
 
 		    postlen = av_len(postav);

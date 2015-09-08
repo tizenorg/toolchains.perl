@@ -60,7 +60,3 @@ BEGIN {
 }
 EXPECT
 Helloworld
-########
-# no implicit features with 'no'
-eval "no " . ($]+1); print $@;
-EXPECT

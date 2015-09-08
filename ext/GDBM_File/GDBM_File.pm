@@ -43,12 +43,12 @@ package GDBM_File;
 
 use strict;
 use warnings;
-our($VERSION, @ISA, @EXPORT);
+our($VERSION, @ISA, @EXPORT, $AUTOLOAD);
 
 require Carp;
 require Tie::Hash;
 require Exporter;
-require XSLoader;
+use XSLoader ();
 @ISA = qw(Tie::Hash Exporter);
 @EXPORT = qw(
 	GDBM_CACHESIZE
@@ -69,8 +69,18 @@ require XSLoader;
 );
 
 # This module isn't dual life, so no need for dev version numbers.
-$VERSION = '1.14';
+$VERSION = '1.10';
 
-XSLoader::load();
+sub AUTOLOAD {
+    my($constname);
+    ($constname = $AUTOLOAD) =~ s/.*:://;
+    my ($error, $val) = constant($constname);
+    Carp::croak $error if $error;
+    no strict 'refs';
+    *{$AUTOLOAD} = sub { $val };
+    goto &{$AUTOLOAD};
+}
+
+XSLoader::load 'GDBM_File', $VERSION;
 
 1;

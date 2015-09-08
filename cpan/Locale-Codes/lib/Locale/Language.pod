@@ -1,91 +1,115 @@
-=pod
 
 =head1 NAME
 
-Locale::Language - standard codes for language identification
+Locale::Language - ISO two letter codes for language identification (ISO 639)
 
 =head1 SYNOPSIS
 
-   use Locale::Language;
+    use Locale::Language;
+    
+    $lang = code2language('en');        # $lang gets 'English'
+    $code = language2code('French');    # $code gets 'fr'
+    
+    @codes   = all_language_codes();
+    @names   = all_language_names();
 
-   $lang = code2language('en');        # $lang gets 'English'
-   $code = language2code('French');    # $code gets 'fr'
-
-   @codes   = all_language_codes();
-   @names   = all_language_names();
 
 =head1 DESCRIPTION
 
-The C<Locale::Language> module provides access to standard codes used
-for identifying languages, such as those as defined in ISO 639.
+The C<Locale::Language> module provides access to the ISO two-letter
+codes for identifying languages, as defined in ISO 639. You can either
+access the codes via the L<conversion routines> (described below),
+or via the two functions which return lists of all language codes or
+all language names.
 
-Most of the routines take an optional additional argument which
-specifies the code set to use. If not specified, the default ISO
-639 two-letter codes will be used.
 
-=head1 SUPPORTED CODE SETS
+=head1 CONVERSION ROUTINES
 
-There are several different code sets you can use for identifying
-languages. The ones currently supported are:
+There are two conversion routines: C<code2language()> and C<language2code()>.
 
 =over 4
 
-=item B<alpha-2>
+=item code2language()
 
-This is the set of two-letter (lowercase) codes from ISO 639, such
-as 'he' for Hebrew.
+This function takes a two letter language code and returns a string
+which contains the name of the language identified. If the code is
+not a valid language code, as defined by ISO 639, then C<undef>
+will be returned.
 
-This code set is identified with the symbol C<LOCALE_LANG_ALPHA_2>.
+    $lang = code2language($code);
 
-This is the default code set.
+=item language2code()
 
-=item B<alpha-3>
+This function takes a language name and returns the corresponding
+two letter language code, if such exists.
+If the argument could not be identified as a language name,
+then C<undef> will be returned.
 
-This is the set of three-letter (lowercase) bibliographic codes from
-ISO 639, such as 'heb' for Hebrew.
+    $code = language2code('French');
 
-This code set is identified with the symbol C<LOCALE_LANG_ALPHA_3>.
-
-=item B<term>
-
-This is the set of three-letter (lowercase) terminologic codes from
-ISO 639.
-
-This code set is identified with the symbol C<LOCALE_LANG_TERM>.
+The case of the language name is not important.
+See the section L<KNOWN BUGS AND LIMITATIONS> below.
 
 =back
 
-=head1 ROUTINES
+
+=head1 QUERY ROUTINES
+
+There are two function which can be used to obtain a list of all
+language codes, or all language names:
 
 =over 4
 
-=item B<code2language ( CODE [,CODESET] )>
+=item C<all_language_codes()>
 
-=item B<language2code ( NAME [,CODESET] )>
+Returns a list of all two-letter language codes.
+The codes are guaranteed to be all lower-case,
+and not in any particular order.
 
-=item B<language_code2code ( CODE ,CODESET ,CODESET2 )>
+=item C<all_language_names()>
 
-=item B<all_language_codes ( [CODESET] )>
+Returns a list of all language names for which there is a corresponding
+two-letter language code. The names are capitalised, and not returned
+in any particular order.
 
-=item B<all_language_names ( [CODESET] )>
+=back
 
-=item B<Locale::Language::rename_language  ( CODE ,NEW_NAME [,CODESET] )>
 
-=item B<Locale::Language::add_language  ( CODE ,NAME [,CODESET] )>
+=head1 EXAMPLES
 
-=item B<Locale::Language::delete_language  ( CODE [,CODESET] )>
+The following example illustrates use of the C<code2language()> function.
+The user is prompted for a language code, and then told the corresponding
+language name:
 
-=item B<Locale::Language::add_language_alias  ( NAME ,NEW_NAME )>
+    $| = 1;    # turn off buffering
+    
+    print "Enter language code: ";
+    chop($code = <STDIN>);
+    $lang = code2language($code);
+    if (defined $lang)
+    {
+        print "$code = $lang\n";
+    }
+    else
+    {
+        print "'$code' is not a valid language code!\n";
+    }
 
-=item B<Locale::Language::delete_language_alias  ( NAME )>
+=head1 KNOWN BUGS AND LIMITATIONS
 
-=item B<Locale::Language::rename_language_code  ( CODE ,NEW_CODE [,CODESET] )>
+=over 4
 
-=item B<Locale::Language::add_language_code_alias  ( CODE ,NEW_CODE [,CODESET] )>
+=item *
 
-=item B<Locale::Language::delete_language_code_alias  ( CODE [,CODESET] )>
+In the current implementation, all data is read in when the
+module is loaded, and then held in memory.
+A lazy implementation would be more memory friendly.
 
-These routines are all documented in the Locale::Codes man page.
+=item *
+
+Currently just supports the two letter language codes -
+there are also three-letter codes, and numbers.
+Would these be of any use to anyone?
 
 =back
 
@@ -93,29 +117,42 @@ These routines are all documented in the Locale::Codes man page.
 
 =over 4
 
-=item B<Locale::Codes>
+=item Locale::Country
 
-=item B<Locale::Constants>
+ISO codes for identification of country (ISO 3166).
+Supports 2-letter, 3-letter, and numeric country codes.
 
-=item B<http://www.loc.gov/standards/iso639-2/>
+=item Locale::Script
 
-Source of the ISO 639 codes.
+ISO codes for identification of written scripts (ISO 15924).
+
+=item Locale::Currency
+
+ISO three letter codes for identification of currencies and funds (ISO 4217).
+
+=item ISO 639:1988 (E/F)
+
+Code for the representation of names of languages.
+
+=item http://lcweb.loc.gov/standards/iso639-2/langhome.html
+
+Home page for ISO 639-2.
 
 =back
 
+
 =head1 AUTHOR
 
-See Locale::Codes for full author history.
-
-Currently maintained by Sullivan Beck (sbeck@cpan.org).
+Neil Bowers E<lt>neil@bowers.comE<gt>
 
 =head1 COPYRIGHT
 
-   Copyright (c) 1997-2001 Canon Research Centre Europe (CRE).
-   Copyright (c) 2001-2010 Neil Bowers
-   Copyright (c) 2010-2011 Sullivan Beck
+Copyright (C) 2002-2004, Neil Bowers.
+
+Copyright (c) 1997-2001 Canon Research Centre Europe (CRE).
 
 This module is free software; you can redistribute it and/or
 modify it under the same terms as Perl itself.
 
 =cut
+

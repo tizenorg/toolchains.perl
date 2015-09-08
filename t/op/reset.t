@@ -13,7 +13,7 @@ plan tests => 24;
 package aiieee;
 
 sub zlopp {
-    (shift =~ m?zlopp?) ? 1 : 0;
+    (shift =~ ?zlopp?) ? 1 : 0;
 }
 
 sub reset_zlopp {
@@ -23,7 +23,7 @@ sub reset_zlopp {
 package CLINK;
 
 sub ZZIP {
-    shift =~ m?ZZIP? ? 1 : 0;
+    shift =~ ?ZZIP? ? 1 : 0;
 }
 
 sub reset_ZZIP {
@@ -88,10 +88,10 @@ use strict;
 
 # Note that there are no digits in this program, other than the placeholders
 sub a {
-m8one8;
+8one8;
 }
 sub b {
-m9two9;
+9two9;
 }
 
 use threads;

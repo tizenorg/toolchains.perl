@@ -3,21 +3,22 @@ package Compress::Zlib;
 
 require 5.004 ;
 require Exporter;
+use AutoLoader;
 use Carp ;
 use IO::Handle ;
 use Scalar::Util qw(dualvar);
 
-use IO::Compress::Base::Common 2.033 ;
-use Compress::Raw::Zlib 2.033 ;
-use IO::Compress::Gzip 2.033 ;
-use IO::Uncompress::Gunzip 2.033 ;
+use IO::Compress::Base::Common 2.024 ;
+use Compress::Raw::Zlib 2.024 ;
+use IO::Compress::Gzip 2.024 ;
+use IO::Uncompress::Gunzip 2.024 ;
 
 use strict ;
 use warnings ;
 use bytes ;
-our ($VERSION, $XS_VERSION, @ISA, @EXPORT, @EXPORT_OK, %EXPORT_TAGS);
+our ($VERSION, $XS_VERSION, @ISA, @EXPORT, @EXPORT_OK, %EXPORT_TAGS, $AUTOLOAD);
 
-$VERSION = '2.033';
+$VERSION = '2.024';
 $XS_VERSION = $VERSION; 
 $VERSION = eval $VERSION;
 
@@ -43,6 +44,16 @@ push @EXPORT, @Compress::Raw::Zlib::EXPORT ;
 BEGIN
 {
     *zlib_version = \&Compress::Raw::Zlib::zlib_version;
+}
+
+sub AUTOLOAD {
+    my($constname);
+    ($constname = $AUTOLOAD) =~ s/.*:://;
+    my ($error, $val) = Compress::Raw::Zlib::constant($constname);
+    Carp::croak $error if $error;
+    no strict 'refs';
+    *{$AUTOLOAD} = sub { $val };
+    goto &{$AUTOLOAD};
 }
 
 use constant FLAG_APPEND             => 1 ;
@@ -451,7 +462,7 @@ sub inflate
 
 package Compress::Zlib ;
 
-use IO::Compress::Gzip::Constants 2.033 ;
+use IO::Compress::Gzip::Constants 2.024 ;
 
 sub memGzip($)
 {
@@ -1007,7 +1018,7 @@ carry out in-memory gzip compression.
 This function is used to uncompress an in-memory gzip file.
 
     $dest = Compress::Zlib::memGunzip($buffer) 
-        or die "Cannot uncompress: $gzerrno\n";
+        or die "Cannot uncomprss: $gzerrno\n";
 
 If successful, it returns the uncompressed gzip file. Otherwise it
 returns C<undef> and the C<$gzerrno> variable will store the zlib error
@@ -1476,7 +1487,7 @@ See the Changes file.
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (c) 1995-2011 Paul Marquess. All rights reserved.
+Copyright (c) 1995-2010 Paul Marquess. All rights reserved.
 
 This program is free software; you can redistribute it and/or
 modify it under the same terms as Perl itself.

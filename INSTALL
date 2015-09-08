@@ -36,18 +36,13 @@ any prefix location by adding "-Dprefix='/some/dir'" to Configure's args.
 To explicitly name the perl binary, use the command
 "make install PERLNAME=myperl".
 
-Building perl from source requires an ANSI compliant C-Compiler.
-A minimum of C89 is required. Some features available in C99 will
-be probed for and used when found. The perl build process does not
-rely on anything more than C89.
-
 These options, and many more, are explained in further detail below.
 
 If you have problems, corrections, or questions, please see
 L<"Reporting Problems"> below.
 
 For information on what's new in this release, see the
-pod/perldelta.pod file.  For more information about how to find more
+pod/perl5120delta.pod file.  For more information about how to find more
 specific detail about changes, see the Changes file.
 
 =head1 DESCRIPTION
@@ -80,10 +75,10 @@ directory.
 
 =head2 Changes and Incompatibilities
 
-Please see pod/perldelta.pod for a description of the changes and
+Please see pod/perl5120delta.pod for a description of the changes and
 potential incompatibilities introduced with this release.  A few of
 the most important issues are listed below, but you should refer
-to pod/perldelta.pod for more detailed information.
+to pod/perl5120delta.pod for more detailed information.
 
 B<WARNING:> This version is not binary compatible with prior releases of Perl.
 If you have built extensions (i.e. modules that include C code)
@@ -98,7 +93,7 @@ The standard extensions supplied with Perl will be handled automatically.
 
 On a related issue, old modules may possibly be affected by the changes
 in the Perl language in the current release.  Please see
-pod/perldelta.pod for a description of what's changed.  See your
+pod/perl5120delta.pod for a description of what's changed.  See your
 installed copy of the perllocal.pod file for a (possibly incomplete)
 list of locally installed modules.  Also see CPAN::autobundle for one
 way to make a "bundle" of your currently installed modules.
@@ -500,10 +495,9 @@ to avoid these leaks. The default is now to perform direct manipulation
 whenever perl is running as a stand alone interpreter, and to call the safe
 but potentially leaky C<putenv()> function when the perl interpreter is
 embedded in another application. You can force perl to always use C<putenv()>
-by compiling with C<-Accflags="-DPERL_USE_SAFE_PUTENV">, see section
-L</"Altering Configure variables for C compiler switches etc.">.
-You can force an embedded perl to use direct manipulation by setting
-C<PL_use_safe_putenv = 0;> after the C<perl_construct()> call.
+by compiling with -DPERL_USE_SAFE_PUTENV. You can force an embedded perl to
+use direct manipulation by setting C<PL_use_safe_putenv = 0;> after the
+C<perl_construct()> call.
 
 =head2 Installation Directories
 
@@ -530,9 +524,9 @@ The directories set up by Configure fall into three broad categories.
 
 =item Directories for the perl distribution
 
-By default, Configure will use the following directories for 5.14.2.
+By default, Configure will use the following directories for 5.12.1.
 $version is the full perl version number, including subversion, e.g.
-5.14.2 or 5.9.5, and $archname is a string like sun4-sunos,
+5.12.1 or 5.9.5, and $archname is a string like sun4-sunos,
 determined by Configure.  The full definitions of all Configure
 variables are in the file Porting/Glossary.
 
@@ -836,13 +830,6 @@ modules, you can specify to not include the paths found:
 
        sh Configure -Dinc_version_list=none ...
 
-If you do want to use modules from some previous perl versions, the variable
-must contain a space separated list of directories under the site_perl
-directory, and has to include architecture-dependent directories separately,
-eg.
-
-       sh Configure -Dinc_version_list="5.14.0/x86_64-linux 5.14.0" ...
-
 When using the newer perl, you can add these paths again in the
 $PERL5LIB environment variable or with perl's -I runtime option.
 
@@ -984,7 +971,7 @@ Perl comes with interfaces to number of libraries, including threads,
 dbm, ndbm, gdbm, and Berkeley db.  For the *db* extension, if
 Configure can find the appropriate header files and libraries, it will
 automatically include that extension.  The threading extension needs
-to be specified explicitly (see L<Threads>).
+to be specified explicitely (see L<Threads>).
 
 Those libraries are not distributed with perl. If your header (.h) files
 for those libraries are not in a directory normally searched by your C
@@ -1300,7 +1287,7 @@ various other operating systems.
 
 If you plan to port Perl to a new architecture, study carefully the
 section titled "Philosophical Issues in Patching and Porting Perl"
-in the file Porting/pumpkin.pod and the file pod/perlgit.pod.
+in the file Porting/pumpkin.pod and the file pod/perlrepository.pod.
 Study also how other non-UNIX ports have solved problems.
 
 =back
@@ -2118,7 +2105,6 @@ make install will install the following:
 	psed		A Perl implementation of sed
 	ptar		A Perl implementation of tar
 	ptardiff	A diff for tar archives
-	ptargrep	A grep for tar archives
 	s2p		sed-to-perl translator
 	shasum		A tool to print or check SHA checksums
 	splain		Describe Perl warnings and errors
@@ -2300,7 +2286,7 @@ http://www.chiark.greenend.org.uk/~sgtatham/bugs.html
 
 =head1 Coexistence with earlier versions of perl 5
 
-Perl 5.14 is not binary compatible with earlier versions of Perl.
+Perl 5.12 is not binary compatible with earlier versions of Perl.
 In other words, you will have to recompile your XS modules.
 
 In general, you can usually safely upgrade from one version of Perl (e.g.
@@ -2374,9 +2360,9 @@ won't interfere with another version.  (The defaults guarantee this for
 libraries after 5.6.0, but not for executables. TODO?)  One convenient
 way to do this is by using a separate prefix for each version, such as
 
-	sh Configure -Dprefix=/opt/perl5.14.2
+	sh Configure -Dprefix=/opt/perl5.12.1
 
-and adding /opt/perl5.14.2/bin to the shell PATH variable.  Such users
+and adding /opt/perl5.12.1/bin to the shell PATH variable.  Such users
 may also wish to add a symbolic link /usr/local/bin/perl so that
 scripts can still start with #!/usr/local/bin/perl.
 
@@ -2389,13 +2375,13 @@ seriously consider using a separate directory, since development
 subversions may not have all the compatibility wrinkles ironed out
 yet.
 
-=head2 Upgrading from 5.13.11 or earlier
+=head2 Upgrading from 5.11.0 or earlier
 
-B<Perl 5.14.2 is binary incompatible with Perl 5.13.11 and any earlier
+B<Perl 5.12.1 is binary incompatible with Perl 5.11.1 and any earlier
 Perl release.>  Perl modules having binary parts
 (meaning that a C compiler is used) will have to be recompiled to be
-used with 5.14.2.  If you find you do need to rebuild an extension with
-5.14.2, you may safely do so without disturbing the older
+used with 5.12.1.  If you find you do need to rebuild an extension with
+5.12.1, you may safely do so without disturbing the older
 installations.  (See L<"Coexistence with earlier versions of perl 5">
 above.)
 

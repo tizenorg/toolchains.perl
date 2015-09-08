@@ -181,6 +181,12 @@ do{ my $x = [
                                                    },
                                      'description' => 'Bundle Module::Build in inc/'
                                    },
+         'YAML_support' => {
+                             'requires' => {
+                                             'YAML::Tiny' => '1.38'
+                                           },
+                             'description' => 'Use YAML::Tiny to write META.yml files'
+                           },
          'manpage_support' => {
                                 'requires' => {
                                                 'Pod::Man' => 0

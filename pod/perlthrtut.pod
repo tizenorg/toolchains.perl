@@ -1,5 +1,3 @@
-=encoding utf8
-
 =head1 NAME
 
 perlthrtut - Tutorial on threads in Perl
@@ -1080,13 +1078,13 @@ on your way to becoming a threaded Perl expert.
 Annotated POD for L<threads>:
 L<http://annocpan.org/?mode=search&field=Module&name=threads>
 
-Latest version of L<threads> on CPAN:
+Lastest version of L<threads> on CPAN:
 L<http://search.cpan.org/search?module=threads>
 
 Annotated POD for L<threads::shared>:
 L<http://annocpan.org/?mode=search&field=Module&name=threads%3A%3Ashared>
 
-Latest version of L<threads::shared> on CPAN:
+Lastest version of L<threads::shared> on CPAN:
 L<http://search.cpan.org/search?module=threads%3A%3Ashared>
 
 Perl threads mailing list:

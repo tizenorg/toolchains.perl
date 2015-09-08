@@ -9,12 +9,12 @@ our (@ISA, $VERSION, @EXPORT_OK, %EXPORT_TAGS);
 @ISA    = qw(Exporter IO::File);
 
 
-$VERSION = '2.033';
+$VERSION = '2.024';
 
 use constant G_EOF => 0 ;
 use constant G_ERR => -1 ;
 
-use IO::Compress::Base::Common 2.033 ;
+use IO::Compress::Base::Common 2.024 ;
 #use Parse::Parameters ;
 
 use IO::File ;
@@ -34,11 +34,9 @@ sub smartRead
     my $self = $_[0];
     my $out = $_[1];
     my $size = $_[2];
-    #$$out = "" ;
     $$out = "" ;
 
     my $offset = 0 ;
-    my $status = 1;
 
 
     if (defined *$self->{InputLength}) {
@@ -71,12 +69,11 @@ sub smartRead
             # because the filehandle may not support the offset parameter
             # An example is Net::FTP
             my $tmp = '';
-            $status = *$self->{FH}->read($tmp, $get_size) ;
-            substr($$out, $offset) = $tmp
-                if defined $status && $status > 0 ;
+            *$self->{FH}->read($tmp, $get_size) &&
+                (substr($$out, $offset) = $tmp);
         }
         else
-          { $status = *$self->{FH}->read($$out, $get_size) }
+          { *$self->{FH}->read($$out, $get_size) }
     }
     elsif (defined *$self->{InputEvent}) {
         my $got = 1 ;
@@ -108,11 +105,6 @@ sub smartRead
     *$self->{InputLengthRemaining} -= length($$out) #- $offset 
         if defined *$self->{InputLength};
         
-    if (! defined $status) {
-        $self->saveStatus($!) ;
-        return STATUS_ERROR;
-    }
-
     $self->saveStatus(length $$out < 0 ? STATUS_ERROR : STATUS_OK) ;
 
     return length $$out;
@@ -784,8 +776,8 @@ sub readBlock
     }
     
     my $status = $self->smartRead($buff, $size) ;
-    return $self->saveErrorString(STATUS_ERROR, "Error Reading Data: $!")
-        if $status == STATUS_ERROR  ;
+    return $self->saveErrorString(STATUS_ERROR, "Error Reading Data")
+        if $status < 0  ;
 
     if ($status == 0 ) {
         *$self->{Closed} = 1 ;
@@ -822,7 +814,7 @@ sub _raw_read
         my $len = $self->smartRead(\$tmp_buff, *$self->{BlockSize}) ;
         
         return $self->saveErrorString(G_ERR, "Error reading data: $!", $!) 
-                if $len == STATUS_ERROR ;
+                if $len < 0 ;
 
         if ($len == 0 ) {
             *$self->{EndStream} = 1 ;
@@ -988,7 +980,7 @@ sub gotoNextStream
     #*$self->{EndStream} = 0 ;
 
     if ( ! defined $magic) {
-        if (! *$self->{Transparent} || $self->eof())
+        if (! *$self->{Transparent} )
         {
             *$self->{EndStream} = 1 ;
             return 0;
@@ -1131,34 +1123,33 @@ sub read
 sub _getline
 {
     my $self = shift ;
-    my $status = 0 ;
 
     # Slurp Mode
     if ( ! defined $/ ) {
         my $data ;
-        1 while ($status = $self->read($data)) > 0 ;
-        return $status < 0 ? \undef : \$data ;
+        1 while $self->read($data) > 0 ;
+        return \$data ;
     }
 
     # Record Mode
     if ( ref $/ eq 'SCALAR' && ${$/} =~ /^\d+$/ && ${$/} > 0) {
         my $reclen = ${$/} ;
         my $data ;
-        $status = $self->read($data, $reclen) ;
-        return $status < 0 ? \undef : \$data ;
+        $self->read($data, $reclen) ;
+        return \$data ;
     }
 
     # Paragraph Mode
     if ( ! length $/ ) {
         my $paragraph ;    
-        while (($status = $self->read($paragraph)) > 0 ) {
+        while ($self->read($paragraph) > 0 ) {
             if ($paragraph =~ s/^(.*?\n\n+)//s) {
                 *$self->{Pending}  = $paragraph ;
                 my $par = $1 ;
                 return \$par ;
             }
         }
-        return $status < 0 ? \undef : \$paragraph;
+        return \$paragraph;
     }
 
     # $/ isn't empty, or a reference, so it's Line Mode.
@@ -1174,7 +1165,7 @@ sub _getline
             return \$l;
         }
 
-        while (($status = $self->read($line)) > 0 ) {
+        while ($self->read($line) > 0 ) {
             my $offset = index($line, $/);
             if ($offset >= 0) {
                 my $l = substr($line, 0, $offset + length $/ );
@@ -1184,7 +1175,7 @@ sub _getline
             }
         }
 
-        return $status < 0 ? \undef : \$line;
+        return \$line;
     }
 }
 
@@ -1454,7 +1445,7 @@ IO::Uncompress::Base - Base Class for IO::Uncompress modules
 =head1 DESCRIPTION
 
 This module is not intended for direct use in application code. Its sole
-purpose if to to be sub-classed by IO::Uncompress modules.
+purpose if to to be sub-classed by IO::Unompress modules.
 
 =head1 SEE ALSO
 
@@ -1476,7 +1467,7 @@ See the Changes file.
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (c) 2005-2011 Paul Marquess. All rights reserved.
+Copyright (c) 2005-2010 Paul Marquess. All rights reserved.
 
 This program is free software; you can redistribute it and/or
 modify it under the same terms as Perl itself.

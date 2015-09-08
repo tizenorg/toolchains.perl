@@ -7,7 +7,6 @@ use lib 't/lib';
 use MBTest 'no_plan';
 
 use DistGen qw(undent);
-use CPAN::Meta::YAML;
 
 blib_load('Module::Build');
 blib_load('Module::Build::ConfigData');
@@ -40,7 +39,7 @@ my %details = (
   dist_version => '0.01',
 );
 my %meta_provides = (
-  'foo' => {
+  'bin-foo' => {
     file => 'bin/foo',
     version => '0.01',
   }
@@ -69,11 +68,13 @@ is($mb->dist_name, 'bin-foo');
 is($mb->dist_version, '0.01');
 is_deeply($mb->dist_author,
   ['A. U. Thor, a.u.thor@a.galaxy.far.far.away']);
-my $result;
-stdout_stderr_of( sub { $result = $mb->dispatch('distmeta') } );
-ok $result;
+ok $mb->dispatch('distmeta');
 
-my $yml = CPAN::Meta::YAML->read_string(slurp('META.yml'))->[0];
-is_deeply($yml->{provides}, \%meta_provides);
-
+SKIP: {
+  skip( 'YAML_support feature is not enabled', 1 )
+      unless Module::Build::ConfigData->feature('YAML_support');
+  require YAML::Tiny;
+  my $yml = YAML::Tiny::LoadFile('META.yml');
+  is_deeply($yml->{provides}, \%meta_provides);
+}
 $dist->chdir_original if $dist->did_chdir;

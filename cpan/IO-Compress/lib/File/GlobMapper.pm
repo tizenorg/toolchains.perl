@@ -31,7 +31,7 @@ $VERSION = '1.000';
 
 
 our ($noPreBS, $metachars, $matchMetaRE, %mapping, %wildCount);
-$noPreBS = '(?<!\\\)' ; # no preceding backslash
+$noPreBS = '(?<!\\\)' ; # no preceeding backslash
 $metachars = '.*?[](){}';
 $matchMetaRE = '[' . quotemeta($metachars) . ']';
 
@@ -309,7 +309,7 @@ sub _parseOutputGlob
             if $1 > $maxwild ;
     }
 
-    my $noPreBS = '(?<!\\\)' ; # no preceding backslash
+    my $noPreBS = '(?<!\\\)' ; # no preceeding backslash
     #warn "noPreBS = '$noPreBS'\n";
 
     #$string =~ s/${noPreBS}\$(\d)/\${$1}/g;

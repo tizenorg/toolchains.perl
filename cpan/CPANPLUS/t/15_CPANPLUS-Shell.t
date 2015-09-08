@@ -37,15 +37,12 @@ my $Default = SHELL_DEFAULT;
 my $TestMod = TEST_CONF_MODULE;
 my $TestAuth= TEST_CONF_AUTHOR;
 
-unless ( -t ) {
-  ok('We are not on a terminal');
-  exit 0;
-}
  
 ### basic load tests
 use_ok( $Class, 'Default' );
 is( $Class->which,  SHELL_DEFAULT,
                                 "Default shell loaded" );
+
 ### create an object
 my $Shell = $Class->new( $Conf );
 ok( $Shell,                     "   New object created" );
@@ -135,7 +132,7 @@ isa_ok( $Shell, $Default,       "   Object" );
 
 __END__
 
-#### test separately, they have side effects
+#### test seperately, they have side effects     
 'q'                     => qr/^$/,          # no output!
 's save boxed'          => do { my $re = CONFIG_BOXED;       qr/$re/ },        
 ### this doens't write any output 

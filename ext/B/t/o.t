@@ -31,14 +31,16 @@ plan( 9 ); # And someone's responsible.
 # use() makes it difficult to avoid O::import()
 require_ok( 'O' );
 
-my @lines = get_lines( '-MO=success,foo,bar' );
+my @args = ('-Ilib', '-MO=success,foo,bar', '-e', '1' );
+my @lines = get_lines( @args );
 
 is( $lines[0], 'Compiling!', 'Output should not be saved without -q switch' );
 is( $lines[1], '(foo) <bar>', 'O.pm should call backend compile() method' );
 is( $lines[2], '[]', 'Nothing should be in $O::BEGIN_output without -q' );
 is( $lines[3], '-e syntax OK', 'O.pm should not munge perl output without -qq');
 
-@lines = get_lines( '-MO=-q,success,foo,bar' );
+$args[1] = '-MO=-q,success,foo,bar';
+@lines = get_lines( @args );
 isnt( $lines[1], 'Compiling!', 'Output should not be printed with -q switch' );
 
 SKIP: {
@@ -46,18 +48,18 @@ SKIP: {
 		unless $Config{useperlio};
 	is( $lines[1], "[Compiling!", '... but should be in $O::BEGIN_output' );
 
-	@lines = get_lines( '-MO=-qq,success,foo,bar' );
+	$args[1] = '-MO=-qq,success,foo,bar';
+	@lines = get_lines( @args );
 	is( scalar @lines, 3, '-qq should suppress even the syntax OK message' );
 }
 
-@lines = get_lines( '-MO=success,fail' );
+$args[1] = '-MO=success,fail';
+@lines = get_lines( @args );
 like( $lines[1], qr/fail at .eval/,
 	'O.pm should die if backend compile() does not return a subref' );
 
 sub get_lines {
-    my $compile = shift;
-	split(/[\r\n]+/, runperl( switches => [ '-Ilib', $compile ],
-				  prog => 1, stderr => 1 ));
+	split(/[\r\n]+/, runperl( args => [ @_ ], stderr => 1 ));
 }
 
 END {

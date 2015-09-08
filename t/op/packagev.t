@@ -17,8 +17,8 @@ my @syntax_cases = (
 
 my @version_cases = <DATA>;
 
-plan tests => 7 * @syntax_cases + 7 * (grep { $_ !~ /^#/ } @version_cases)
-            + 2 * 3;
+plan tests => 5 * @syntax_cases + 5 * (grep { $_ !~ /^#/ } @version_cases)
+            + 3;
 
 use warnings qw/syntax/;
 use version;
@@ -34,10 +34,6 @@ for my $string ( @syntax_cases ) {
     is( $@, '', qq/eval "{$string}"/ );
     eval "{ $string }";
     is( $@, '', qq/eval "{ $string }"/ );
-    eval "${string}{}";
-    is( $@, '', qq/eval "${string}{}"/ );
-    eval "$string {}";
-    is( $@, '', qq/eval "$string {}"/ );
 }
 
 LINE:
@@ -56,20 +52,19 @@ for my $line (@version_cases) {
     $match =~ s/\s*\z//; # kill trailing spaces
 
     # First handle the 'package NAME VERSION' case
-    foreach my $suffix (";", "{}") {
-	$withversion::VERSION = undef;
-	if ($package eq 'fail') {
-	    eval "package withversion $v$suffix";
-	    like($@, qr/$match/, "package withversion $v$suffix -> syntax error ($match)");
-	    ok(! version::is_strict($v), qq{... and "$v" should also fail STRICT regex});
-	}
-	else {
-	    my $ok = eval "package withversion $v$suffix $v eq \$withversion::VERSION";
-	    ok($ok, "package withversion $v$suffix")
-	      or diag( $@ ? $@ : "and \$VERSION = $withversion::VERSION");
-	    ok( version::is_strict($v), qq{... and "$v" should pass STRICT regex});
-	}
+    $withversion::VERSION = undef;
+    if ($package eq 'fail') {
+	eval "package withversion $v";
+	like($@, qr/$match/, "package withversion $v -> syntax error ($match)");
+	ok(! version::is_strict($v), qq{... and "$v" should also fail STRICT regex});
     }
+    else {
+	my $ok = eval "package withversion $v; $v eq \$withversion::VERSION";
+	ok($ok, "package withversion $v")
+          or diag( $@ ? $@ : "and \$VERSION = $withversion::VERSION");
+	ok( version::is_strict($v), qq{... and "$v" should pass STRICT regex});
+    }
+
 
     # Now check the version->new("V") case
     my $ver = undef;
@@ -109,8 +104,6 @@ for my $line (@version_cases) {
 #
 for my $v ("1", "1.23", "v1.2.3") {
     ok (run_perl (prog => "package Foo\n$v; print 1;"),
-                          "New line between package name and version");
-    ok (run_perl (prog => "package Foo\n$v { print 1; }"),
                           "New line between package name and version");
 }
 

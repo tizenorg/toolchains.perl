@@ -10,7 +10,7 @@ BEGIN {
     require "./test.pl";
 }
 
-plan tests => 125;
+plan tests => 124;
 
 $a = {};
 bless $a, "Bob";
@@ -200,9 +200,6 @@ is $@, '';
 # This segfaulted in a blead.
 fresh_perl_is('package Foo; Foo->VERSION;  print "ok"', 'ok');
 
-# So did this.
-fresh_perl_is('$:; UNIVERSAL::isa(":","Unicode::String");print "ok"','ok');
-
 package Foo;
 
 sub DOES { 1 }
@@ -301,7 +298,7 @@ use warnings "deprecated";
     @RT66112::B::ISA = qw//;
     @RT66112::C::ISA = qw/RT66112::B/;
     @RT66112::T3::ISA = qw/RT66112::C/;
-    ok(RT66112::T3->isa('RT66112::A'), "modify \@ISA in isa (RT66112::T3 isa RT66112::A)") or require mro, diag "@{mro::get_linear_isa('RT66112::T3')}";
+    ok(RT66112::T3->isa('RT66112::A'), "modify \@ISA in isa (RT66112::T3 isa RT66112::A)");
 
     @RT66112::E::ISA = qw/RT66112::D/;
     @RT66112::T4::ISA = qw/RT66112::E/;

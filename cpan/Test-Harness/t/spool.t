@@ -53,7 +53,6 @@ BEGIN {
 
 use TAP::Harness;
 use TAP::Parser;
-use TAP::Parser::Iterator::Array;
 
 plan tests => 4;
 
@@ -113,8 +112,8 @@ END_TAP
 
     my $parser = TAP::Parser->new(
         {   spool => $spoolHandle,
-            iterator =>
-              TAP::Parser::Iterator::Array->new( [ split /\n/ => $tap ] )
+            stream =>
+              TAP::Parser::IteratorFactory->new( [ split /\n/ => $tap ] )
         }
     );
 

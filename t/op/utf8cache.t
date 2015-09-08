@@ -1,16 +1,17 @@
-#!./perl -w
+#!./perl
 # Test for malfunctions of utf8 cache
 
 BEGIN {
     chdir 't' if -d 't';
     @INC = '../lib';
-    require './test.pl';
-    skip_all_without_dynamic_extension('Devel::Peek');
 }
 
-use strict;
-
-plan(tests => 1);
+unless (eval { require Devel::Peek }) {
+    print "# Without Devel::Peek, never mind\n";
+    print "1..0\n";
+    exit;
+}
+print "1..1\n";
 
 my $pid = open CHILD, '-|';
 die "kablam: $!\n" unless defined $pid;
@@ -34,4 +35,7 @@ my $utf8magic = qr{ ^ \s+ MAGIC \s = .* \n
                       \s+ MG_TYPE \s = \s PERL_MAGIC_utf8 .* \n
                       \s+ MG_LEN \s = .* \n }xm;
 
-unlike($_, qr{ $utf8magic $utf8magic }x);
+if (m{ $utf8magic $utf8magic }x) {
+    print "not ";
+}
+print "ok 1\n";

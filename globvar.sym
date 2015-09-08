@@ -6,9 +6,7 @@
 bincompat_options
 block_type
 check
-core_reg_engine
 fold
-fold_latin1
 fold_locale
 freq
 keyword_plugin
@@ -29,7 +27,6 @@ no_wrongref
 op_desc
 op_name
 opargs
-phase_names
 ppaddr
 regkind
 reg_name
@@ -37,11 +34,9 @@ reg_extflags_name
 sig_name
 sig_num
 simple
-simple_bitmask
 utf8skip
 uuemap
 varies
-varies_bitmask
 vtbl_amagic
 vtbl_amagicelem
 vtbl_arylen

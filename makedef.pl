@@ -4,6 +4,7 @@
 #
 # Needed by WIN32 and OS/2 for creating perl.dll,
 # and by AIX for creating libperl.a when -Dusershrplib is in effect,
+# and by MacOS Classic.
 #
 # Reads from information stored in
 #
@@ -12,6 +13,7 @@
 #    global.sym
 #    globvar.sym
 #    intrpvar.h
+#    macperl.sym  (on MacOS)
 #    miniperl.map (on OS/2)
 #    perl5.def    (on OS/2; this is the old version of the file being made)
 #    perlio.sym
@@ -57,7 +59,7 @@ while (@ARGV) {
     }
 }
 
-my @PLATFORM = qw(aix win32 wince os2 netware);
+my @PLATFORM = qw(aix win32 wince os2 MacOS netware);
 my %PLATFORM;
 @PLATFORM{@PLATFORM} = ();
 
@@ -102,6 +104,7 @@ my $config_h    = "config.h";
 my $intrpvar_h  = "intrpvar.h";
 my $perlvars_h  = "perlvars.h";
 my $global_sym  = "global.sym";
+my $pp_sym      = "pp.sym";
 my $globvar_sym = "globvar.sym";
 my $perlio_sym  = "perlio.sym";
 my $static_ext = "";
@@ -111,12 +114,19 @@ if ($PLATFORM eq 'aix') {
 }
 elsif ($PLATFORM =~ /^win(?:32|ce)$/ || $PLATFORM eq 'netware') {
     $CCTYPE = "MSVC" unless defined $CCTYPE;
-    foreach ($intrpvar_h, $perlvars_h, $global_sym, $globvar_sym, $perlio_sym) {
+    foreach ($intrpvar_h, $perlvars_h, $global_sym,
+	     $pp_sym, $globvar_sym, $perlio_sym) {
 	s!^!..\\!;
     }
 }
+elsif ($PLATFORM eq 'MacOS') {
+    foreach ($intrpvar_h, $perlvars_h, $global_sym,
+	     $pp_sym, $globvar_sym, $perlio_sym) {
+	s!^!::!;
+    }
+}
 
-unless ($PLATFORM eq 'win32' || $PLATFORM eq 'wince' || $PLATFORM eq 'netware') {
+unless ($PLATFORM eq 'win32' || $PLATFORM eq 'wince' || $PLATFORM eq 'MacOS' || $PLATFORM eq 'netware') {
     open(CFG,$config_sh) || die "Cannot open $config_sh: $!\n";
     while (<CFG>) {
 	if (/^(?:ccflags|optimize)='(.+)'$/) {
@@ -179,11 +189,11 @@ my $sym_ord = 0;
 print STDERR "Defines: (" . join(' ', sort keys %define) . ")\n";
 
 if ($PLATFORM =~ /^win(?:32|ce)$/) {
-    (my $dll = ($define{PERL_DLL} || "perl514")) =~ s/\.dll$//i;
+    (my $dll = ($define{PERL_DLL} || "perl512")) =~ s/\.dll$//i;
     print "LIBRARY $dll\n";
     # The DESCRIPTION module definition file statement is not supported
     # by VC7 onwards.
-    if ($CCTYPE =~ /^(?:MSVC60|GCC|BORLAND)$/) {
+    if ($CCTYPE !~ /^MSVC7/ && $CCTYPE !~ /^MSVC8/ && $CCTYPE !~ /^MSVC9/) {
 	print "DESCRIPTION 'Perl interpreter'\n";
     }
     print "EXPORTS\n";
@@ -235,7 +245,7 @@ elsif ($PLATFORM eq 'aix') {
 }
 elsif ($PLATFORM eq 'netware') {
 	if ($FILETYPE eq 'def') {
-	print "LIBRARY perl514\n";
+	print "LIBRARY perl512\n";
 	print "DESCRIPTION 'Perl interpreter for NetWare'\n";
 	print "EXPORTS\n";
 	}
@@ -507,6 +517,34 @@ elsif ($PLATFORM eq 'os2') {
 		    )])
       if $define{'USE_5005THREADS'} or $define{'USE_ITHREADS'};
 }
+elsif ($PLATFORM eq 'MacOS') {
+    skip_symbols [qw(
+		    Perl_GetVars
+		    PL_cryptseen
+		    PL_cshlen
+		    PL_cshname
+		    PL_statusvalue_vms
+		    PL_sys_intern
+		    PL_opsave
+		    PL_timesbuf
+		    Perl_dump_fds
+		    Perl_my_bcopy
+		    Perl_my_bzero
+		    Perl_my_chsize
+		    Perl_my_htonl
+		    Perl_my_memcmp
+		    Perl_my_memset
+		    Perl_my_ntohl
+		    Perl_my_swap
+		    Perl_safexcalloc
+		    Perl_safexfree
+		    Perl_safexmalloc
+		    Perl_safexrealloc
+		    Perl_unlnk
+		    Perl_sys_intern_clear
+		    Perl_sys_intern_init
+		    )];
+}
 elsif ($PLATFORM eq 'netware') {
 	skip_symbols [qw(
 			PL_statusvalue_vms
@@ -723,8 +761,6 @@ unless ($define{'USE_ITHREADS'}) {
 		    PL_my_ctx_mutex
 		    PL_perlio_mutex
 		    PL_regdupe
-		    Perl_clone_params_del
-		    Perl_clone_params_new
 		    Perl_parser_dup
 		    Perl_dirp_dup
 		    Perl_cx_dup
@@ -738,7 +774,6 @@ unless ($define{'USE_ITHREADS'}) {
 		    Perl_mro_meta_dup
 		    Perl_re_dup_guts
 		    Perl_sv_dup
-		    Perl_sv_dup_inc
 		    Perl_rvpv_dup
 		    Perl_hek_dup
 		    Perl_sys_intern_dup
@@ -964,7 +999,7 @@ if ($define{'PERL_GLOBAL_STRUCT'}) {
 
 # functions from *.sym files
 
-my @syms = ($global_sym, $globvar_sym);
+my @syms = ($global_sym, $globvar_sym); # $pp_sym is not part of the API
 
 # Symbols that are the public face of the PerlIO layers implementation
 # These are in _addition to_ the public face of the abstraction
@@ -1183,10 +1218,14 @@ for my $syms (@syms) {
 
 # variables
 
-if ($define{'MULTIPLICITY'} && $define{PERL_GLOBAL_STRUCT}) {
-    for my $f ($perlvars_h) {
+if ($define{'MULTIPLICITY'}) {
+    for my $f ($perlvars_h, $intrpvar_h) {
 	my $glob = readvar($f, sub { "Perl_" . $_[1] . $_[2] . "_ptr" });
 	emit_symbols $glob;
+    }
+    unless ($define{'USE_ITHREADS'}) {
+	# XXX needed for XS extensions that define PERL_CORE
+	emit_symbol("PL_curinterp");
     }
     # XXX AIX seems to want the perlvars.h symbols, for some reason
     if ($PLATFORM eq 'aix' or $PLATFORM eq 'os2') {	# OS/2 needs PL_thr_key
@@ -1199,7 +1238,7 @@ else {
 	my $glob = readvar($perlvars_h);
 	emit_symbols $glob;
     }
-    unless ($define{MULTIPLICITY}) {
+    unless ($define{'MULTIPLICITY'}) {
 	my $glob = readvar($intrpvar_h);
 	emit_symbols $glob;
     }
@@ -1401,6 +1440,15 @@ elsif ($PLATFORM eq 'os2') {
 		    keys %export;
     @missing = grep { !exists $exportperlmalloc{$_} } @missing;
     delete $export{$_} foreach @missing;
+}
+elsif ($PLATFORM eq 'MacOS') {
+    open MACSYMS, 'macperl.sym' or die 'Cannot read macperl.sym';
+
+    while (<MACSYMS>) {
+	try_symbol($_);
+    }
+
+    close MACSYMS;
 }
 elsif ($PLATFORM eq 'netware') {
 foreach my $symbol (qw(
@@ -1615,7 +1663,7 @@ sub output_symbol {
 	  $ordinal{$exportperlmalloc{$symbol}} || ++$sym_ord
 	  if $exportperlmalloc and exists $exportperlmalloc{$symbol};
     }
-    elsif ($PLATFORM eq 'aix') {
+    elsif ($PLATFORM eq 'aix' || $PLATFORM eq 'MacOS') {
 	print "$symbol\n";
     }
 	elsif ($PLATFORM eq 'netware') {

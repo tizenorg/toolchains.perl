@@ -1,15 +1,15 @@
 #!./perl
 
-# check to see if subroutine declarations work everywhere
+# check to see if subroutine declarations work everwhere
 
 sub one {
     print "ok 1\n";
 }
 format one =
-ok 6
+ok 5
 .
 
-print "1..9\n";
+print "1..7\n";
 
 one();
 two();
@@ -30,32 +30,18 @@ if ($x eq $x) {
 }
 
 four();
-five();
 $~ = 'one';
 write;
 $~ = 'two';
-$foo = "ok 7";
+$foo = "ok 6";
 write;
 $~ = 'three';
 write;
 
 format three =
-ok 8
+ok 7
 .
-
-if ($x eq $x) {
-    goto quux;
-}
-
-print "not ok 9\n";
-exit 1;
 
 sub four {
     print "ok 4\n";
 }
-
-quux:
-sub five {
-    print "ok 5\n";
-}
-print "ok 9\n";

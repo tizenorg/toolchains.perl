@@ -32,7 +32,7 @@ if (! -e $Dfile) {
 SKIP:
 {
     skip( "different file permission semantics",1)
-                      if $Is_Dosish;
+                      if ($Is_Dosish || $^O eq 'MacOS') ;
     ($dev,$ino,$mode,$nlink,$uid,$gid,$rdev,$size,$atime,$mtime,$ctime,
      $blksize,$blocks) = stat($Dfile);
     ok(($mode & 0777) == ($^O eq 'vos' ? 0750 : 0640) , "File permissions");

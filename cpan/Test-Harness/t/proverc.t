@@ -1,9 +1,5 @@
 #!/usr/bin/perl -w
 
-BEGIN {
-    unshift @INC, 't/lib';
-}
-
 use strict;
 use lib 't/lib';
 use Test::More tests => 1;

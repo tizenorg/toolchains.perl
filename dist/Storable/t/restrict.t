@@ -8,7 +8,6 @@
 
 sub BEGIN {
     unshift @INC, 't';
-    unshift @INC, 't/compat' if $] < 5.006002;
     if ($ENV{PERL_CORE}){
         require Config;
         if ($Config::Config{'extensions'} !~ /\bStorable\b/) {
@@ -20,7 +19,7 @@ sub BEGIN {
 	    print "1..0 # Skip: No Hash::Util pre 5.005\n";
 	    exit 0;
 	    # And doing this seems on 5.004 seems to create bogus warnings about
-	    # uninitialized variables, or coredumps in Perl_pp_padsv
+	    # unitialized variables, or coredumps in Perl_pp_padsv
 	} elsif (!eval "require Hash::Util") {
             if ($@ =~ /Can\'t locate Hash\/Util\.pm in \@INC/s) {
                 print "1..0 # Skip: No Hash::Util:\n";
@@ -31,12 +30,14 @@ sub BEGIN {
         }
 	unshift @INC, 't';
     }
+    require 'st-dump.pl';
 }
 
 
 use Storable qw(dclone freeze thaw);
 use Hash::Util qw(lock_hash unlock_value);
-use Test::More tests => 100;
+
+print "1..100\n";
 
 my %hash = (question => '?', answer => 42, extra => 'junk', undef => undef);
 lock_hash %hash;
@@ -66,27 +67,37 @@ sub testit {
 
   my @in_keys = sort keys %$hash;
   my @out_keys = sort keys %$copy;
-  is("@in_keys", "@out_keys", "keys match after deep clone");
+  unless (ok ++$test, "@in_keys" eq "@out_keys") {
+    print "# Failed: keys mis-match after deep clone.\n";
+    print "# Original keys: @in_keys\n";
+    print "# Copy's keys: @out_keys\n";
+  }
 
   # $copy = $hash;	# used in initial debug of the tests
 
-  is(Internals::SvREADONLY(%$copy), 1, "cloned hash restricted?");
+  ok ++$test, Internals::SvREADONLY(%$copy), "cloned hash restricted?";
 
-  is(Internals::SvREADONLY($copy->{question}), 1,
-     "key 'question' not locked in copy?");
+  ok ++$test, Internals::SvREADONLY($copy->{question}),
+    "key 'question' not locked in copy?";
 
-  is(Internals::SvREADONLY($copy->{answer}), '',
-     "key 'answer' not locked in copy?");
+  ok ++$test, !Internals::SvREADONLY($copy->{answer}),
+    "key 'answer' not locked in copy?";
 
   eval { $copy->{extra} = 15 } ;
-  is($@, '', "Can assign to reserved key 'extra'?");
+  unless (ok ++$test, !$@, "Can assign to reserved key 'extra'?") {
+    my $diag = $@;
+    $diag =~ s/\n.*\z//s;
+    print "# \$\@: $diag\n";
+  }
 
   eval { $copy->{nono} = 7 } ;
-  isnt($@, '', "Can not assign to invalid key 'nono'?");
+  ok ++$test, $@, "Can not assign to invalid key 'nono'?";
 
-  is(exists $copy->{undef}, 1, "key 'undef' exists");
+  ok ++$test, exists $copy->{undef},
+    "key 'undef' exists";
 
-  is($copy->{undef}, undef, "value for key 'undef' is undefined");
+  ok ++$test, !defined $copy->{undef},
+    "value for key 'undef' is undefined";
 }
 
 for $Storable::canonical (0, 1) {
@@ -108,7 +119,11 @@ for $Storable::canonical (0, 1) {
     for (0..16) {
       my $k = "k$_";
       eval { $copy->{$k} = undef } ;
-      is($@, '', "Can assign to reserved key '$k'?");
+      unless (ok ++$test, !$@, "Can assign to reserved key '$k'?") {
+	my $diag = $@;
+	$diag =~ s/\n.*\z//s;
+	print "# \$\@: $diag\n";
+      }
     }
   }
 }

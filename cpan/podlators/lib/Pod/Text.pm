@@ -29,7 +29,6 @@ use strict;
 use vars qw(@ISA @EXPORT %ESCAPES $VERSION);
 
 use Carp qw(carp croak);
-use Encode qw(encode);
 use Exporter ();
 use Pod::Simple ();
 
@@ -38,7 +37,7 @@ use Pod::Simple ();
 # We have to export pod2text for backward compatibility.
 @EXPORT = qw(pod2text);
 
-$VERSION = '3.15';
+$VERSION = '3.14';
 
 ##############################################################################
 # Initialization
@@ -251,8 +250,7 @@ sub reformat {
 # necessary to match the input encoding unless UTF-8 output is forced.  This
 # preserves the traditional pass-through behavior of Pod::Text.
 sub output {
-    my ($self, @text) = @_;
-    my $text = join ('', @text);
+    my ($self, $text) = @_;
     $text =~ tr/\240\255/ /d;
     unless ($$self{opt_utf8} || $$self{CHECKED_ENCODING}) {
         my $encoding = $$self{encoding} || '';
@@ -261,11 +259,7 @@ sub output {
         }
         $$self{CHECKED_ENCODING} = 1;
     }
-    if ($$self{ENCODE}) {
-        print { $$self{output_fh} } encode ('UTF-8', $text);
-    } else {
-        print { $$self{output_fh} } $text;
-    }
+    print { $$self{output_fh} } $text;
 }
 
 # Output a block of code (something that isn't part of the POD text).  Called
@@ -290,19 +284,17 @@ sub start_document {
     # We have to redo encoding handling for each document.
     delete $$self{CHECKED_ENCODING};
 
-    # When UTF-8 output is set, check whether our output file handle already
-    # has a PerlIO encoding layer set.  If it does not, we'll need to encode
-    # our output before printing it (handled in the output() sub).  Wrap the
-    # check in an eval to handle versions of Perl without PerlIO.
-    $$self{ENCODE} = 0;
+    # If we were given the utf8 option, set an output encoding on our file
+    # handle.  Wrap in an eval in case we're using a version of Perl too old
+    # to understand this.
+    #
+    # This is evil because it changes the global state of a file handle that
+    # we may not own.  However, we can't just blindly encode all output, since
+    # there may be a pre-applied output encoding (such as from PERL_UNICODE)
+    # and then we would double-encode.  This seems to be the least bad
+    # approach.
     if ($$self{opt_utf8}) {
-        $$self{ENCODE} = 1;
-        eval {
-            my @layers = PerlIO::get_layers ($$self{output_fh});
-            if (grep { $_ eq 'utf8' } @layers) {
-                $$self{ENCODE} = 0;
-            }
-        };
+        eval { binmode ($$self{output_fh}, ':encoding(UTF-8)') };
     }
 
     return '';

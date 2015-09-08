@@ -8,11 +8,14 @@ BEGIN {
     chdir 't' if -d 't';
     @INC = '../lib';
     require Config; import Config;
-    require './test.pl';
-    skip_all_without_config('d_fork');
+    unless ($Config{'d_fork'}) {
+        print "1..0 # Skip: no fork\n";
+	    exit 0;
+    }
+    require './test.pl'
 }
 
-plan tests => 84;
+plan tests => 78;
 
 my $STDOUT = tempfile();
 my $STDERR = tempfile();
@@ -24,10 +27,10 @@ delete $ENV{PERL5LIB};
 delete $ENV{PERL5OPT};
 
 
-# Run perl with specified environment and arguments, return (STDOUT, STDERR)
 sub runperl_and_capture {
   local *F;
   my ($env, $args) = @_;
+  unshift @$args, '-I../lib';
 
   local %ENV = %ENV;
   delete $ENV{PERLLIB};
@@ -36,35 +39,54 @@ sub runperl_and_capture {
   my $pid = fork;
   return (0, "Couldn't fork: $!") unless defined $pid;   # failure
   if ($pid) {                   # parent
+    my ($actual_stdout, $actual_stderr);
     wait;
     return (0, "Failure in child.\n") if ($?>>8) == $FAILURE_CODE;
 
-    open my $stdout, '<', $STDOUT
-	or return (0, "Couldn't read $STDOUT file: $!");
-    open my $stderr, '<', $STDERR
-	or return (0, "Couldn't read $STDERR file: $!");
-    local $/;
-    # Empty file with <$stderr> returns nothing in list context
-    # (because there are no lines) Use scalar to force it to ''
-    return (scalar <$stdout>, scalar <$stderr>);
+    open F, "< $STDOUT" or return (0, "Couldn't read $STDOUT file");
+    { local $/; $actual_stdout = <F> }
+    open F, "< $STDERR" or return (0, "Couldn't read $STDERR file");
+    { local $/; $actual_stderr = <F> }
+
+    return ($actual_stdout, $actual_stderr);
   } else {                      # child
     for my $k (keys %$env) {
       $ENV{$k} = $env->{$k};
     }
-    open STDOUT, '>', $STDOUT or exit $FAILURE_CODE;
-    open STDERR, '>', $STDERR and do { exec $PERL, @$args };
-    # it didn't_work:
-    print STDOUT "IWHCWJIHCI\cNHJWCJQWKJQJWCQW\n";
-    exit $FAILURE_CODE;
+    open STDOUT, "> $STDOUT" or exit $FAILURE_CODE;
+    open STDERR, "> $STDERR" or it_didnt_work();
+    { exec $PERL, @$args }
+    it_didnt_work();
   }
 }
 
-sub try {
+# Run perl with specified environment and arguments returns a list.
+# First element is true if Perl's stdout and stderr match the
+# supplied $stdout and $stderr argument strings exactly.
+# second element is an explanation of the failure
+sub runperl {
+  local *F;
   my ($env, $args, $stdout, $stderr) = @_;
   my ($actual_stdout, $actual_stderr) = runperl_and_capture($env, $args);
+  if ($actual_stdout ne $stdout) {
+    return (0, "Stdout mismatch: expected [$stdout], saw [$actual_stdout]");
+  } elsif ($actual_stderr ne $stderr) {
+    return (0, "Stderr mismatch: expected [$stderr], saw [$actual_stderr]");
+  } else {
+    return 1;                 # success
+  }
+}
+
+sub it_didnt_work {
+    print STDOUT "IWHCWJIHCI\cNHJWCJQWKJQJWCQW\n";
+    exit $FAILURE_CODE;
+}
+
+sub try {
+  my ($success, $reason) = runperl(@_);
+  $reason =~ s/\n/\\n/g if defined $reason;
   local $::Level = $::Level + 1;
-  is ($stdout, $actual_stdout);
-  is ($stderr, $actual_stderr);
+  ok( $success, $reason );
 }
 
 #  PERL5OPT    Command-line options (switches).  Switches in
@@ -81,20 +103,20 @@ try({PERL5OPT => '-w'}, ['-e', 'print $::x'],
     "", 
     qq{Name "main::x" used only once: possible typo at -e line 1.\nUse of uninitialized value \$x in print at -e line 1.\n});
 
-try({PERL5OPT => '-Mstrict'}, ['-I../lib', '-e', 'print $::x'],
+try({PERL5OPT => '-Mstrict'}, ['-e', 'print $::x'],
     "", "");
 
-try({PERL5OPT => '-Mstrict'}, ['-I../lib', '-e', 'print $x'],
+try({PERL5OPT => '-Mstrict'}, ['-e', 'print $x'],
     "", 
     qq{Global symbol "\$x" requires explicit package name at -e line 1.\nExecution of -e aborted due to compilation errors.\n});
 
 # Fails in 5.6.0
-try({PERL5OPT => '-Mstrict -w'}, ['-I../lib', '-e', 'print $x'],
+try({PERL5OPT => '-Mstrict -w'}, ['-e', 'print $x'],
     "", 
     qq{Global symbol "\$x" requires explicit package name at -e line 1.\nExecution of -e aborted due to compilation errors.\n});
 
 # Fails in 5.6.0
-try({PERL5OPT => '-w -Mstrict'}, ['-I../lib', '-e', 'print $::x'],
+try({PERL5OPT => '-w -Mstrict'}, ['-e', 'print $::x'],
     "", 
     <<ERROR
 Name "main::x" used only once: possible typo at -e line 1.
@@ -103,7 +125,7 @@ ERROR
     );
 
 # Fails in 5.6.0
-try({PERL5OPT => '-w -Mstrict'}, ['-I../lib', '-e', 'print $::x'],
+try({PERL5OPT => '-w -Mstrict'}, ['-e', 'print $::x'],
     "", 
     <<ERROR
 Name "main::x" used only once: possible typo at -e line 1.
@@ -111,23 +133,23 @@ Use of uninitialized value \$x in print at -e line 1.
 ERROR
     );
 
-try({PERL5OPT => '-MExporter'}, ['-I../lib', '-e0'],
+try({PERL5OPT => '-MExporter'}, ['-e0'],
     "", 
     "");
 
 # Fails in 5.6.0
-try({PERL5OPT => '-MExporter -MExporter'}, ['-I../lib', '-e0'],
+try({PERL5OPT => '-MExporter -MExporter'}, ['-e0'],
     "", 
     "");
 
 try({PERL5OPT => '-Mstrict -Mwarnings'}, 
-    ['-I../lib', '-e', 'print "ok" if $INC{"strict.pm"} and $INC{"warnings.pm"}'],
+    ['-e', 'print "ok" if $INC{"strict.pm"} and $INC{"warnings.pm"}'],
     "ok",
     "");
 
-open my $fh, ">", "Oooof.pm" or die "Can't write Oooof.pm: $!";
-print $fh "package Oooof; 1;\n";
-close $fh;
+open F, ">", "Oooof.pm" or die "Can't write Oooof.pm: $!";
+print F "package Oooof; 1;\n";
+close F;
 END { 1 while unlink "Oooof.pm" }
 
 try({PERL5OPT => '-I. -MOooof'}, 
@@ -151,7 +173,7 @@ try({PERL5OPT => '-t'},
     '');
 
 try({PERL5OPT => '-W'},
-    ['-I../lib','-e', 'local $^W = 0;  no warnings;  print $x'],
+    ['-e', 'local $^W = 0;  no warnings;  print $x'],
     '',
     <<ERROR
 Name "main::x" used only once: possible typo at -e line 1.
@@ -201,7 +223,7 @@ is ($err, '', 'No errors when determining @INC');
 
 my @default_inc = split /\n/, $out;
 
-is ($default_inc[-1], '.', '. is last in @INC');
+is (shift @default_inc, '../lib', 'Our -I../lib is at the front');
 
 my $sep = $Config{path_sep};
 foreach (['nothing', ''],
@@ -229,6 +251,8 @@ foreach (['nothing', ''],
 
   my @inc = split /\n/, $out;
 
+  is (shift @inc, '../lib', 'Our -I../lib is at the front for $name');
+
   is (scalar @inc, scalar @expect,
       "expected number of elements in \@INC for $name");
 
@@ -236,3 +260,8 @@ foreach (['nothing', ''],
 }
 
 # PERL5LIB tests with included arch directories still missing
+
+END {
+    1 while unlink $STDOUT;
+    1 while unlink $STDERR;
+}

@@ -2,8 +2,11 @@ BEGIN {
 	chdir 't' if -d 't';
 	@INC = '../lib';
 	require Config; import Config;
+	unless (find PerlIO::Layer 'perlio') {
+	    print "1..0 # Skip: PerlIO not used\n";
+	    exit 0;
+	}
 	require './test.pl';
-	skip_all_without_perlio();
 }
 
 plan tests => 42;
@@ -102,14 +105,14 @@ ok(close($utffh));
 
       my $filename = find_filename($x, $perlio_tmp_file_glob);
       is($filename, undef, "No tmp files leaked");
-      unlink_all $filename if defined $filename;
+      unlink $filename if defined $filename;
 
       mkdir $ENV{TMPDIR};
       ok(open(my $x,"+<",undef), 'TMPDIR honored by magic temp file via 3 arg open with undef - works if TMPDIR points to an existent dir');
 
       $filename = find_filename($x, $perlio_tmp_file_glob);
       is($filename, undef, "No tmp files leaked");
-      unlink_all $filename if defined $filename;
+      unlink $filename if defined $filename;
     }
 }
 
@@ -195,9 +198,9 @@ close ($no_perlio);
 
 
 END {
-    unlink_all $txt;
-    unlink_all $bin;
-    unlink_all $utf;
+    1 while unlink $txt;
+    1 while unlink $bin;
+    1 while unlink $utf;
     rmdir $nonexistent;
 }
 

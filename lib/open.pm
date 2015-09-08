@@ -1,7 +1,7 @@
 package open;
 use warnings;
 
-our $VERSION = '1.08';
+our $VERSION = '1.07';
 
 require 5.008001; # for PerlIO::get_layers()
 
@@ -108,7 +108,7 @@ sub import {
 	    $in = $out = join(' ', @val);
 	}
 	else {
-	    croak "Unknown PerlIO layer class '$type' (need IN, OUT or IO)";
+	    croak "Unknown PerlIO layer class '$type'";
 	}
     }
     ${^OPEN} = join("\0", $in, $out);

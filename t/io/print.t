@@ -3,12 +3,11 @@
 BEGIN {
     chdir 't' if -d 't';
     @INC = '../lib';
-    require './test.pl';
-    eval 'use Errno';
-    die $@ if $@ and !is_miniperl();
 }
 
 use strict 'vars';
+eval 'use Errno';
+die $@ if $@ and !$ENV{PERL_CORE_MINITEST};
 
 print "1..21\n";
 

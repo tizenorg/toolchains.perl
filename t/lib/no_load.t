@@ -16,9 +16,16 @@ require "test.pl";
 #
 # Format: [Module-that-should-not-be-loaded => modules to test]
 #
+my @TESTS = (
+    [Carp  => qw [warnings Exporter]],
+);
 
-foreach my $test ([Carp  => qw(warnings Exporter)],
-		 ) {
+my $count = 0;
+$count += @$_ - 1 for @TESTS;
+
+print "1..$count\n";
+
+foreach my $test (@TESTS) {
     my ($exclude, @modules) = @$test;
 
     foreach my $module (@modules) {
@@ -30,4 +37,5 @@ foreach my $test ([Carp  => qw(warnings Exporter)],
     }
 }
 
-done_testing();
+
+__END__

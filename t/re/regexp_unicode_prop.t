@@ -8,10 +8,7 @@ use strict;
 use warnings;
 use 5.010;
 
-BEGIN {
-    require './test.pl';
-    skip_all_if_miniperl("no dynamic loading on miniperl, no File::Spec (used by charnames)");
-}
+my $IS_EBCDIC = ord ('A') == 193;
 
 sub run_tests;
 
@@ -64,8 +61,8 @@ my @CLASSES = (
     # It's ok to repeat class names.
     #
     InLatin1Supplement        =>
-               $::IS_EBCDIC ? ['!\x{7f}',  '\x{80}',            '!\x{100}']
-                            : ['!\x{7f}',  '\x{80}',  '\x{ff}', '!\x{100}'],
+               $IS_EBCDIC ? ['!\x{7f}',  '\x{80}',            '!\x{100}']
+                          : ['!\x{7f}',  '\x{80}',  '\x{ff}', '!\x{100}'],
     InLatinExtendedA          =>
                             ['!\x{7f}', '!\x{80}', '!\x{ff}',  '\x{100}'],
 
@@ -91,21 +88,14 @@ my @USER_DEFINED_PROPERTIES = (
    InNotKana                 => ['\x{3040}', '!\x{3041}'],
    InConsonant               => ['d',        '!e'],
    IsSyriac1                 => ['\x{0712}', '!\x{072F}'],
-   '# User-defined character properties may lack \n at the end',
+   Syriac1                   => ['\x{0712}', '!\x{072F}'],
+   '# User-defined character properties my lack \n at the end',
    InGreekSmall              => ['\N{GREEK SMALL LETTER PI}',
                                  '\N{GREEK SMALL LETTER FINAL SIGMA}'],
    InGreekCapital            => ['\N{GREEK CAPITAL LETTER PI}', '!\x{03A2}'],
    Dash                      => ['-'],
    ASCII_Hex_Digit           => ['!-', 'A'],
-   IsAsciiHexAndDash         => ['-', 'A'],
-);
-
-my @USER_CASELESS_PROPERTIES = (
-   #
-   # User defined properties which differ depending on /i.  Second entry is
-   # false regularly, true under /i
-   #
-   'IsMyUpper'                => ["M", "!m" ],
+   AsciiHexAndDash           => ['-', 'A'],
 );
 
 
@@ -128,8 +118,7 @@ my %SHORT_PROPERTIES = (
 #
 # Illegal properties
 #
-my @ILLEGAL_PROPERTIES =
-    qw[q qrst f foo isfoo infoo ISfoo INfoo Is::foo In::foo];
+my @ILLEGAL_PROPERTIES = qw [q qrst];
 
 my %d;
 
@@ -156,7 +145,7 @@ while (my ($class, $chars) = each %SHORT_PROPERTIES) {
                                                      ? $_ : "!$_"} @$chars;
 }
 
-delete $d {IsASCII} if $::IS_EBCDIC;
+delete $d {IsASCII} if $IS_EBCDIC;
 
 push @CLASSES => "# Short properties"        => %SHORT_PROPERTIES,
                  "# POSIX like properties"   => %d,
@@ -169,20 +158,19 @@ push @CLASSES => "# Short properties"        => %SHORT_PROPERTIES,
 my $count = 0;
 for (my $i = 0; $i < @CLASSES; $i += 2) {
     $i ++, redo if $CLASSES [$i] =~ /^\h*#\h*(.*)/;
-    $count += 2 * (length $CLASSES [$i] == 1 ? 4 : 2) * @{$CLASSES [$i + 1]};
+    $count += (length $CLASSES [$i] == 1 ? 4 : 2) * @{$CLASSES [$i + 1]};
 }
-$count += 4 * @ILLEGAL_PROPERTIES;
-$count += 4 * grep {length $_ == 1} @ILLEGAL_PROPERTIES;
-$count += 8 * @USER_CASELESS_PROPERTIES;
+$count += 2 * @ILLEGAL_PROPERTIES;
+$count += 2 * grep {length $_ == 1} @ILLEGAL_PROPERTIES;
 
-plan(tests => $count);
+my $tests = 0;
+
+say "1..$count";
 
 run_tests unless caller ();
 
 sub match {
-    my ($char, $match, $nomatch, $caseless) = @_;
-    $caseless = "" unless defined $caseless;
-    $caseless = 'i' if $caseless;
+    my ($char, $match, $nomatch) = @_;
 
     my ($str, $name);
 
@@ -201,15 +189,10 @@ sub match {
         }
     }
 
-    undef $@;
-    my $match_pat = eval "qr/$match/$caseless";
-    is($@, '', "$name compiled correctly to a regexp");
-    like($str, $match_pat, "$name correctly matched");
-
-    undef $@;
-    my $nomatch_pat = eval "qr/$nomatch/$caseless";
-    is($@, '', "$name compiled correctly to a regexp");
-    unlike($str, $nomatch_pat, "$name correctly did not match");
+    print "not " unless $str =~ /$match/;
+    print "ok ", ++ $tests, " - $name =~ /$match/\n";
+    print "not " unless $str !~ /$nomatch/;
+    print "ok ", ++ $tests, " - $name !~ /$nomatch/\n";
 }
 
 sub run_tests {
@@ -230,7 +213,7 @@ sub run_tests {
         match $_, $in_pat,  $out_pat for @in;
         match $_, $out_pat, $in_pat  for @out;
 
-        if (1 == length $class) {   # Repeat without braces if name length 1
+        if (1 == length $class) {
             my $in_pat  = eval qq ['\\p$class'];
             my $out_pat = eval qq ['\\P$class'];
 
@@ -245,41 +228,22 @@ sub run_tests {
     foreach my $p (@ILLEGAL_PROPERTIES) {
         undef $@;
         my $r = eval "'a' =~ /\\p{$p}/; 1";
-        is($r, undef, "Unknown Unicode property \\p{$p}");
-        like($@, $pat, "Unknown Unicode property \\p{$p}");
+        print "not " unless !$r && $@ && $@ =~ $pat;
+        print "ok ", ++ $tests, " - Unknown Unicode property \\p{$p}\n";
         undef $@;
         my $s = eval "'a' =~ /\\P{$p}/; 1";
-        is($s, undef, "Unknown Unicode property \\p{$p}");
-        like($@, $pat, "Unknown Unicode property \\p{$p}");
+        print "not " unless !$s && $@ && $@ =~ $pat;
+        print "ok ", ++ $tests, " - Unknown Unicode property \\P{$p}\n";
         if (length $p == 1) {
             undef $@;
             my $r = eval "'a' =~ /\\p$p/; 1";
-            is($r, undef, "Unknown Unicode property \\p$p");
-            like($@, $pat, "Unknown Unicode property \\p$p");
+            print "not " unless !$r && $@ && $@ =~ $pat;
+            print "ok ", ++ $tests, " - Unknown Unicode property \\p$p\n";
             undef $@;
             my $s = eval "'a' =~ /\\P$p/; 1";
-            is($r, undef, "Unknown Unicode property \\P$p");
-            like($@, $pat, "Unknown Unicode property \\P$p");
+            print "not " unless !$s && $@ && $@ =~ $pat;
+            print "ok ", ++ $tests, " - Unknown Unicode property \\P$p\n";
         }
-    }
-
-    print "# User-defined properties with /i differences\n";
-    foreach my $class (shift @USER_CASELESS_PROPERTIES) {
-        my $chars_ref = shift @USER_CASELESS_PROPERTIES;
-        my @in      =                       grep {!/^!./} @$chars_ref;
-        my @out     = map {s/^!(?=.)//; $_} grep { /^!./} @$chars_ref;
-        my $in_pat  = eval qq ['\\p{$class}'];
-        my $out_pat = eval qq ['\\P{$class}'];
-
-        # Verify works as regularly for not /i
-        match $_, $in_pat,  $out_pat for @in;
-        match $_, $out_pat, $in_pat  for @out;
-
-        # Verify that adding /i doesn't change the in set.
-        match $_, $in_pat,  $out_pat, 'i' for @in;
-
-        # Verify that adding /i does change the out set to match.
-        match $_, $in_pat,  $out_pat, 'i' for @out;
     }
 }
 
@@ -324,33 +288,17 @@ sub IsSyriac1 {<<'--'}
 0730    074A
 --
 
+sub Syriac1 {<<'--'}
+0712    072C
+0730    074A
+--
+
 sub InGreekSmall   {return "03B1\t03C9"}
 sub InGreekCapital {return "0391\t03A9\n-03A2"}
 
-sub IsAsciiHexAndDash {<<'--'}
+sub AsciiHexAndDash {<<'--'}
 +utf8::ASCII_Hex_Digit
 +utf8::Dash
 --
 
-sub IsMyUpper {
-    my $caseless = shift;
-    if ($caseless) {
-        return "0041\t005A\n0061\t007A"
-    }
-    else {
-        return "0041\t005A"
-    }
-}
-
-# fake user-defined properties; these subs shouldn't be called, because
-# their names don't start with In or Is
-
-sub f       { die }
-sub foo     { die }
-sub isfoo   { die }
-sub infoo   { die }
-sub ISfoo   { die }
-sub INfoo   { die }
-sub Is::foo { die }
-sub In::foo { die }
 __END__

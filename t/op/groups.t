@@ -12,19 +12,21 @@ BEGIN {
 
     chdir 't';
     @INC = '../lib';
-    require './test.pl';
-    skip_all_if_miniperl("no dynamic loading on miniperl, no POSIX");
 }
 use 5.010;
 use strict;
 use Config ();
 use POSIX ();
 
-skip_all('getgrgid() not implemented')
-    unless eval { my($foo) = getgrgid(0); 1 };
+unless (eval { my($foo) = getgrgid(0); 1 }) {
+    quit( "getgrgid() not implemented" );
+}
 
-skip_all("No 'id' or 'groups'") if
-    $^O eq 'MSWin32' || $^O eq 'NetWare' || $^O eq 'VMS' || $^O =~ /lynxos/i;
+quit("No `id' or `groups'") if
+    $^O eq 'MSWin32'
+    || $^O eq 'NetWare'
+    || $^O eq 'VMS'
+    || $^O =~ /lynxos/i;
 
 Test();
 exit;
@@ -36,9 +38,9 @@ sub Test {
     # Get our supplementary groups from the system by running commands
     # like `id -a'.
     my ( $groups_command, $groups_string ) = system_groups()
-        or skip_all("No 'id' or 'groups'");
+        or quit( "No `id' or `groups'" );
     my @extracted_groups = extract_system_groups( $groups_string )
-        or skip_all("Can't parse '${groups_command}'");
+        or quit( "Can't parse `${groups_command}'" );
 
     my $pwgid = $( + 0;
     my ($pwgnam) = getgrgid($pwgid);
@@ -132,6 +134,12 @@ sub Test {
     return;
 }
 
+# Cleanly abort this entire test file
+sub quit {
+    print "1..0 # SKIP: @_\n";
+    exit 0;
+}
+
 # Get the system groups and the command used to fetch them.
 #
 sub system_groups {
@@ -188,14 +196,13 @@ sub _system_groups {
     # prefer 'id' over 'groups' (is this ever wrong anywhere?)
     # and 'id -a' over 'id -Gn' (the former is good about spaces in group names)
 
-    $cmd = 'id -a 2>/dev/null || id 2>/dev/null';
+    $cmd = 'id -a 2>/dev/null';
     $str = `$cmd`;
     if ( $str && $str =~ /groups=/ ) {
         # $str is of the form:
         # uid=39957(gsar) gid=22(users) groups=33536,39181,22(users),0(root),1067(dev)
         # FreeBSD since 6.2 has a fake id -a:
         # uid=1001(tobez) gid=20(staff) groups=20(staff), 0(wheel), 68(dialer)
-        # On AIX it's id
         #
         # Linux may also have a context= field
 

@@ -1,5 +1,3 @@
-use strict;
-
 BEGIN {
   if ($ENV{PERL_CORE}) {
     unless ($ENV{PERL_TEST_Net_Ping}) {
@@ -28,30 +26,41 @@ BEGIN {
 #
 # $ PERL_CORE=1 make test
 
-use Test::More tests => 13;
-BEGIN {use_ok('Net::Ping');}
+use Test;
+use Net::Ping;
+plan tests => 13;
+
+# Everything loaded fine
+ok 1;
 
 my $p = new Net::Ping "tcp",9;
 
-isa_ok($p, 'Net::Ping', 'new() worked');
+# new() worked?
+ok !!$p;
 
-isnt($p->ping("localhost"), 0, 'Test on the default port');
+# Test on the default port
+ok $p -> ping("localhost");
 
 # Change to use the more common web port.
 # This will pull from /etc/services on UNIX.
 # (Make sure getservbyname works in scalar context.)
-isnt($p->{port_num} = (getservbyname("http", "tcp") || 80), undef);
+ok ($p -> {port_num} = (getservbyname("http", "tcp") || 80));
 
-isnt($p->ping("localhost"), 0, 'Test localhost on the web port');
+# Test localhost on the web port
+ok $p -> ping("localhost");
 
 # Hopefully this is never a routeable host
-is($p->ping("172.29.249.249"), 0, "Can't reach 172.29.249.249");
+ok !$p -> ping("172.29.249.249");
 
 # Test a few remote servers
 # Hopefully they are up when the tests are run.
 
-foreach (qw(www.geocities.com ftp.geocities.com
-	    www.freeservers.com ftp.freeservers.com
-	    yahoo.com www.yahoo.com www.about.com)) {
-    isnt($p->ping($_), 0, "Can ping $_");
-}
+ok $p -> ping("www.geocities.com");
+ok $p -> ping("ftp.geocities.com");
+
+ok $p -> ping("www.freeservers.com");
+ok $p -> ping("ftp.freeservers.com");
+
+ok $p -> ping("yahoo.com");
+ok $p -> ping("www.yahoo.com");
+ok $p -> ping("www.about.com");

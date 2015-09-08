@@ -369,13 +369,13 @@ $DEFINES = '';
 
 $perl++ if $0 =~ m#/?c2ph$#;
 
-use Getopt::Std qw(getopts);
+require 'getopts.pl';
 
 use File::Temp 'tempdir';
 
 eval '$'.$1.'$2;' while $ARGV[0] =~ /^([A-Za-z_]+=)(.*)/ && shift;
 
-getopts('aixdpvtnws:') || &usage(0);
+&Getopts('aixdpvtnws:') || &usage(0);
 
 $opt_d && $debug++;
 $opt_t && $trace++;
@@ -394,7 +394,7 @@ eval '$'.$1.'$2;' while $ARGV[0] =~ /^([A-Za-z_]+=)(.*)/ && shift;
 
 sub PLUMBER {
     select(STDERR);
-    print "oops, apparent pager foulup\n";
+    print "oops, apperent pager foulup\n";
     $isatty++;
     &usage(1);
 }

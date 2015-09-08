@@ -13,16 +13,11 @@ perl_version=`awk '/define[ 	]+PERL_VERSION/ {print $3}' $src/patchlevel.h`
 perl_subversion=`awk '/define[ 	]+PERL_SUBVERSION/ {print $3}' $src/patchlevel.h`
 version="${perl_revision}.${perl_version}.${perl_subversion}"
 
-# Pretend that Darwin doesn't know about those system calls in Tiger
-# (10.4/darwin 8) and earlier [perl #24122]
-case "$osvers" in
-[1-8].*)
-    d_setregid='undef'
-    d_setreuid='undef'
-    d_setrgid='undef'
-    d_setruid='undef'
-    ;;
-esac
+# Pretend that Darwin doesn't know about those system calls [perl #24122]
+d_setregid='undef'
+d_setreuid='undef'
+d_setrgid='undef'
+d_setruid='undef'
 
 # This was previously used in all but causes three cases
 # (no -Ddprefix=, -Dprefix=/usr, -Dprefix=/some/thing/else)
@@ -73,10 +68,8 @@ esac
 # Since we can build fat, the archname doesn't need the processor type
 archname='darwin';
 
-# nm isn't known to work after Snow Leopard and XCode 4; testing with OS X 10.5
-# and Xcode 3 shows a working nm, but pretending it doesn't work produces no
-# problems.
-usenm='false';
+# nm works.
+usenm='true';
 
 case "$optimize" in
 '')
@@ -128,13 +121,11 @@ case "$(grep '^#define INT32_MIN' /usr/include/stdint.h)" in
 esac
 
 # Avoid Apple's cpp precompiler, better for extensions
-if [ "X`echo | ${cc} -no-cpp-precomp -E - 2>&1 >/dev/null`" = "X" ]; then
-    cppflags="${cppflags} -no-cpp-precomp"
+cppflags="${cppflags} -no-cpp-precomp"
 
-    # This is necessary because perl's build system doesn't
-    # apply cppflags to cc compile lines as it should.
-    ccflags="${ccflags} ${cppflags}"
-fi
+# This is necessary because perl's build system doesn't
+# apply cppflags to cc compile lines as it should.
+ccflags="${ccflags} ${cppflags}"
 
 # Known optimizer problems.
 case "`cc -v 2>&1`" in

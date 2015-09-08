@@ -1,5 +1,3 @@
-warn "Legacy library @{[(caller(0))[6]]} will be removed from the Perl core distribution in the next major release. Please install it from the CPAN distribution Perl4::CoreLibs. It is being used at @{[(caller)[1]]}, line @{[(caller)[2]]}.\n";
-
 ;# getopts.pl - a better getopt.pl
 #
 # This library is no longer being maintained, and is included for backward
@@ -18,12 +16,13 @@ sub Getopts {
     local($argumentative) = @_;
     local(@args,$_,$first,$rest);
     local($errs) = 0;
+    local($[) = 0;
 
     @args = split( / */, $argumentative );
     while(@ARGV && ($_ = $ARGV[0]) =~ /^-(.)(.*)/) {
 		($first,$rest) = ($1,$2);
 		$pos = index($argumentative,$first);
-		if($pos >= 0) {
+		if($pos >= $[) {
 			if($args[$pos+1] eq ':') {
 				shift(@ARGV);
 				if($rest eq '') {

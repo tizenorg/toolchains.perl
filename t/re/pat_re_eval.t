@@ -17,8 +17,7 @@ $| = 1;
 BEGIN {
     chdir 't' if -d 't';
     @INC = ('../lib','.');
-    require './test.pl';
-    skip_all_if_miniperl("no dynamic loading on miniperl, no re");
+    do "re/ReTest.pl" or die $@;
 }
 
 
@@ -31,37 +30,37 @@ run_tests() unless caller;
 #
 sub run_tests {
     {
-        my $message =  "Call code from qr //";
+        local $Message =  "Call code from qr //";
         local $_ = 'var="foo"';
         $a = qr/(?{++$b})/;
         $b = 7;
-        ok(/$a$a/ && $b eq '9', $message);
+        ok /$a$a/ && $b eq '9';
 
         my $c="$a";
-        ok(/$a$a/ && $b eq '11', $message);
+        ok /$a$a/ && $b eq '11';
 
         undef $@;
         eval {/$c/};
-        like($@, qr/not allowed at runtime/, $message);
+        ok $@ && $@ =~ /not allowed at runtime/;
 
         use re "eval";
         /$a$c$a/;
-        is($b, '14', $message);
+        iseq $b, '14';
 
         our $lex_a = 43;
         our $lex_b = 17;
         our $lex_c = 27;
         my $lex_res = ($lex_b =~ qr/$lex_b(?{ $lex_c = $lex_a++ })/);
 
-        is($lex_res, 1, $message);
-        is($lex_a, 44, $message);
-        is($lex_c, 43, $message);
+        iseq $lex_res, 1;
+        iseq $lex_a, 44;
+        iseq $lex_c, 43;
 
         no re "eval";
         undef $@;
         my $match = eval { /$a$c$a/ };
-        ok($@ && $@ =~ /Eval-group not allowed/ && !$match, $message);
-        is($b, '14', $message);
+        ok $@ && $@ =~ /Eval-group not allowed/ && !$match;
+        iseq $b, '14';
 
         $lex_a = 2;
         $lex_a = 43;
@@ -69,16 +68,16 @@ sub run_tests {
         $lex_c = 27;
         $lex_res = ($lex_b =~ qr/17(?{ $lex_c = $lex_a++ })/);
 
-        is($lex_res, 1, $message);
-        is($lex_a, 44, $message);
-        is($lex_c, 43, $message);
+        iseq $lex_res, 1;
+        iseq $lex_a, 44;
+        iseq $lex_c, 43;
 
     }
 
     {
         our $a = bless qr /foo/ => 'Foo';
         ok 'goodfood' =~ $a,     "Reblessed qr // matches";
-        is($a, '(?^:foo)', "Reblessed qr // stringifies");
+        iseq $a, '(?-xism:foo)', "Reblessed qr // stringifies";
         my $x = "\x{3fe}";
         my $z = my $y = "\317\276";  # Byte representation of $x
         $a = qr /$x/;
@@ -87,10 +86,10 @@ sub run_tests {
         ok "a$x" =~ /^a$a\z/, "Interpolated qr // preserves UTF-8";
         ok "a$x" =~ /^a(??{$a})\z/,
                         "Postponed interpolation of qr // preserves UTF-8";
-
-
-        is(length qr /##/x, 9, "## in qr // doesn't corrupt memory; Bug 17776");
-
+        {
+            local $BugId = '17776';
+            iseq length qr /##/x, 12, "## in qr // doesn't corrupt memory";
+        }
         {
             use re 'eval';
             ok "$x$x" =~ /^$x(??{$x})\z/,
@@ -117,7 +116,7 @@ sub run_tests {
 
     {
         use re 'eval';
-        # Test if $^N and $+ work in (?{{})
+        local $Message = 'Test if $^N and $+ work in (?{{})';
         our @ctl_n = ();
         our @plus = ();
         our $nested_tags;
@@ -164,14 +163,14 @@ sub run_tests {
               # unset @ctl_n and @plus
               @ctl_n = @plus = ();
             }
-            is("@ctl_n", $test->[2], "ctl_n $c");
-            is("@plus", $test->[3], "plus $c");
+            iseq("@ctl_n", $test->[2], "ctl_n $c");
+            iseq("@plus", $test->[3], "plus $c");
         }
     }
 
     {
         use re 'eval';
-
+        local $BugId = '56194';
 
         our $f;
         local $f;
@@ -179,7 +178,7 @@ sub run_tests {
             defined $_[0] ? $_[0] : "undef";
         };
 
-        like("123", qr/^(\d)(((??{1 + $^N})))+$/, 'Bug 56194');
+        ok("123" =~ m/^(\d)(((??{1 + $^N})))+$/);
 
         our @ctl_n;
         our @plus;
@@ -302,15 +301,15 @@ sub run_tests {
             my $str = join(", ", '$1 = '.$f->($1), '$2 = '.$f->($2), '$3 = '.$f->($3), '$4 = '.$f->($4),'$5 = '.$f->($5));
             push @ctl_n, $f->($^N);
             push @plus, $f->($+);
-            ok($match, "match $c; Bug 56194");
+            ok($match, "match $c");
             if (not $match) {
                 # unset $str, @ctl_n and @plus
                 $str = "";
                 @ctl_n = @plus = ();
             }
-            is("@ctl_n", $test->[2], "ctl_n $c; Bug 56194");
-            is("@plus", $test->[3], "plus $c; Bug 56194");
-            is($str, $test->[4], "str $c; Bug 56194");
+            iseq("@ctl_n", $test->[2], "ctl_n $c");
+            iseq("@plus", $test->[3], "plus $c");
+            iseq($str, $test->[4], "str $c");
         }
         SKIP: {
             if ($] le '5.010') {
@@ -327,18 +326,16 @@ sub run_tests {
             my $str = join(", ", '$1 = '.$f->($1), '$2 = '.$f->($2), '$3 = '.$f->($3), '$4 = '.$f->($4),'$5 = '.$f->($5),'$^R = '.$f->($^R));
             push @ctl_n, $f->($^N);
             push @plus, $f->($+);
-            ok($match, 'Bug 56194');
+            ok($match);
             if (not $match) {
                 # unset $str
                 @ctl_n = ();
                 @plus = ();
                 $str = "";
             }
-            is("@ctl_n", "1 2 undef", 'Bug 56194');
-            is("@plus", "1 2 undef", 'Bug 56194');
-            is($str,
-               "\$1 = undef, \$2 = undef, \$3 = undef, \$4 = undef, \$5 = undef, \$^R = undef",
-               'Bug 56194');
+            iseq("@ctl_n", "1 2 undef");
+            iseq("@plus", "1 2 undef");
+            iseq($str, "\$1 = undef, \$2 = undef, \$3 = undef, \$4 = undef, \$5 = undef, \$^R = undef");
        }
     }
 

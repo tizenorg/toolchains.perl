@@ -1,7 +1,7 @@
 package CPAN::Index;
 use strict;
 use vars qw($LAST_TIME $DATE_OF_02 $DATE_OF_03 $HAVE_REANIMATED $VERSION);
-$VERSION = "1.9600";
+$VERSION = "1.94";
 @CPAN::Index::ISA = qw(CPAN::Debug);
 $LAST_TIME ||= 0;
 $DATE_OF_03 ||= 0;
@@ -292,7 +292,6 @@ sub rd_modpacks {
         $shift =~ /^Last-Updated:\s+(.+)/ and $last_updated = $1;
     }
     CPAN->debug("line_count[$line_count]last_updated[$last_updated]") if $CPAN::DEBUG;
-    my $errors = 0;
     if (not defined $line_count) {
 
         $CPAN::Frontend->mywarn(qq{Warning: Your $index_target does not contain a Line-Count header.
@@ -300,7 +299,7 @@ Please check the validity of the index file by comparing it to more
 than one CPAN mirror. I'll continue but problems seem likely to
 happen.\a
 });
-        $errors++;
+
         $CPAN::Frontend->mysleep(5);
     } elsif ($line_count != scalar @lines) {
 
@@ -318,7 +317,7 @@ Please check the validity of the index file by comparing it to more
 than one CPAN mirror. I'll continue but problems seem likely to
 happen.\a
 });
-        $errors++;
+
         $CPAN::Frontend->mysleep(5);
     } else {
 
@@ -372,19 +371,14 @@ happen.\a
     my(%exists);
     my $i = 0;
     my $painted = 0;
- LINE: foreach (@lines) {
+    foreach (@lines) {
         # before 1.56 we split into 3 and discarded the rest. From
         # 1.57 we assign remaining text to $comment thus allowing to
         # influence isa_perl
         my($mod,$version,$dist,$comment) = split " ", $_, 4;
         unless ($mod && defined $version && $dist) {
-            require Dumpvalue;
-            my $dv = Dumpvalue->new(tick => '"');
-            $CPAN::Frontend->mywarn(sprintf "Could not split line[%s]\n", $dv->stringify($_));
-            if ($errors++ >= 5){
-                $CPAN::Frontend->mydie("Giving up parsing your $index_target, too many errors");
-            }
-            next LINE;
+            $CPAN::Frontend->mywarn("Could not split line[$_]\n");
+            next;
         }
         my($bundle,$id,$userid);
 

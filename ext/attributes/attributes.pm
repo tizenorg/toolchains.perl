@@ -1,6 +1,6 @@
 package attributes;
 
-our $VERSION = 0.14;
+our $VERSION = 0.12;
 
 @EXPORT_OK = qw(get reftype);
 @EXPORT = ();
@@ -98,7 +98,7 @@ sub get ($) {
 sub require_version { goto &UNIVERSAL::VERSION }
 
 require XSLoader;
-XSLoader::load();
+XSLoader::load('attributes', $VERSION);
 
 1;
 __END__

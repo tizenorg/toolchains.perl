@@ -84,8 +84,6 @@ sub reset {
   my %options = @_;
 
   $options{name} ||= 'Simple';
-  $options{version} ||= q{'0.01'};
-  $options{license} ||= 'perl';
   $options{dir} = File::Spec->rel2abs(
     defined $options{dir} ? $options{dir} : MBTest->tmpdir
   );
@@ -153,7 +151,7 @@ sub _gen_default_filedata {
 
       my \$builder = Module::Build->new(
           module_name         => '$self->{name}',
-          license             => '$self->{license}',
+          license             => 'perl',
       );
 
       \$builder->create_build_script();
@@ -166,7 +164,7 @@ sub _gen_default_filedata {
 
       my \$builder = Module::Build->new(
           module_name         => '$self->{name}',
-          license             => '$self->{license}',
+          license             => 'perl',
       );
 
       \$builder->create_build_script();
@@ -181,7 +179,7 @@ sub _gen_default_filedata {
       package $self->{name};
 
       use vars qw( \$VERSION );
-      \$VERSION = $self->{version};
+      \$VERSION = '0.01';
 
       use strict;
 
@@ -216,7 +214,7 @@ sub _gen_default_filedata {
     $self->$add_unless($module_filename, undent(<<"      ---"));
       package $self->{name};
 
-      \$VERSION = $self->{version};
+      \$VERSION = '0.01';
 
       require Exporter;
       require DynaLoader;
@@ -629,8 +627,6 @@ The C<new> method does not write any files -- see L</regen()> below.
 
   my $dist = DistGen->new(
     name        => 'Foo::Bar',
-    version     => '0.01',
-    license     => 'perl',
     dir         => MBTest->tmpdir,
     xs          => 1,
     no_manifest => 0,
@@ -645,17 +641,6 @@ The parameters are as follows.
 The name of the module this distribution represents. The default is
 'Simple'.  This should be a "Foo::Bar" (module) name, not a "Foo-Bar"
 dist name.
-
-=item version
-
-The version string that will be set. (E.g. C<our $VERSION = 0.01>)
-Note -- to put this value in quotes, add those to the string.
-
-  version => q{'0.01_01'}
-
-=item license
-
-The license string that will be set in Build.PL.  Defaults to 'perl'.
 
 =item dir
 

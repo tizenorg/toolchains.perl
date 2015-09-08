@@ -16,7 +16,6 @@ use strict;
 use Encode;
 use Encode::Alias;
 my %a2c;
-my @override_tests;
 my $ON_EBCDIC;
 
 sub init_a2c{
@@ -109,14 +108,6 @@ BEGIN{
     @ARGV and $ON_EBCDIC = $ARGV[0] eq 'EBCDIC';
     $Encode::ON_EBCDIC = $ON_EBCDIC;
     init_a2c();
-    @override_tests = qw(
-        myascii:cp1252
-        mygreek:cp1253
-        myhebrew:iso-8859-2
-        myarabic:cp1256
-        ueightsomething:utf-8-strict
-        unknown:
-    );
 }
 
 if ($ON_EBCDIC){
@@ -129,7 +120,7 @@ if ($ON_EBCDIC){
     };
 }
 
-use Test::More tests => (scalar keys %a2c) * 3 + @override_tests;
+use Test::More tests => (scalar keys %a2c) * 4;
 
 print "# alias test;  \$ON_EBCDIC == $ON_EBCDIC\n";
 
@@ -143,29 +134,20 @@ foreach my $a (keys %a2c){
 # now we override some of the aliases and see if it works fine
 
 define_alias(
-         qr/ascii/i    => '"WinLatin1"',
-         qr/cyrillic/i => '"WinCyrillic"',
-         qr/arabic/i   => '"WinArabic"',
-         qr/greek/i    => '"WinGreek"',
-         qr/hebrew/i   => '"WinHebrew"'
+         qr/ascii/i    => 'WinLatin1',
+         qr/cyrillic/i => 'WinCyrillic',
+         qr/arabic/i   => 'WinArabic',
+         qr/greek/i    => 'WinGreek',
+         qr/hebrew/i   => 'WinHebrew'
         );
-
-Encode::find_encoding("myhebrew");  # polute alias cache
-
-define_alias( sub {
-    my $enc = shift;
-    return "iso-8859-2"     if $enc =~ /hebrew/i;
-    return "does-not-exist" if $enc =~ /arabic/i;  # should then use other override alias
-    return "utf-8"          if $enc =~ /eight/i;
-    return;
-});
 
 print "# alias test with alias overrides\n";
 
-for my $test (@override_tests) {
-    my($a, $c) = split /:/, $test;
+foreach my $a (keys %a2c){	
+    print "# $a => $a2c{$a}\n";
     my $e = Encode::find_encoding($a);
-    is((defined($e) and $e->name), $c, $a);
+    is((defined($e) and $e->name), $a2c{$a}, "Override $a")
+    or warn "alias was $a";
 }
 
 print "# alias undef test\n";

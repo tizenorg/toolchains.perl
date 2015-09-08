@@ -9,14 +9,9 @@ BEGIN { require "./test.pl"; }
 
 plan(tests => 23);
 
-my ($devnull, $no_devnull);
+use File::Spec;
 
-if (is_miniperl()) {
-    $no_devnull = "no dynamic loading on miniperl, File::Spec not built, so can't determine /dev/null";
-} else {
-    require File::Spec;
-    $devnull = File::Spec->devnull;
-}
+my $devnull = File::Spec->devnull;
 
 open(TRY, '>Io_argv1.tmp') || (die "Can't open temp file: $!");
 print TRY "a line\n";
@@ -50,8 +45,7 @@ is($x, "1a line\n2a line\n", '<> from two files');
     is( 0+$?, 0, q(eof() doesn't segfault) );
 }
 
-@ARGV = is_miniperl() ? ('Io_argv1.tmp', 'Io_argv1.tmp', 'Io_argv1.tmp')
-    : ('Io_argv1.tmp', 'Io_argv1.tmp', $devnull, 'Io_argv1.tmp');
+@ARGV = ('Io_argv1.tmp', 'Io_argv1.tmp', $devnull, 'Io_argv1.tmp');
 while (<>) {
     $y .= $. . $_;
     if (eof()) {
@@ -96,40 +90,35 @@ ok( !eof(),     'STDIN has something' );
 
 is( <>, "ok 7\n" );
 
-SKIP: {
-    skip_if_miniperl($no_devnull, 4);
-    open STDIN, $devnull or die $!;
-    @ARGV = ();
-    ok( eof(),      'eof() true with empty @ARGV' );
+open STDIN, $devnull or die $!;
+@ARGV = ();
+ok( eof(),      'eof() true with empty @ARGV' );
 
-    @ARGV = ('Io_argv1.tmp');
-    ok( !eof() );
+@ARGV = ('Io_argv1.tmp');
+ok( !eof() );
 
-    @ARGV = ($devnull, $devnull);
-    ok( !eof() );
+@ARGV = ($devnull, $devnull);
+ok( !eof() );
 
-    close ARGV or die $!;
-    ok( eof(),      'eof() true after closing ARGV' );
-}
+close ARGV or die $!;
+ok( eof(),      'eof() true after closing ARGV' );
 
-SKIP: {
+{
     local $/;
-    open my $fh, 'Io_argv1.tmp' or die "Could not open Io_argv1.tmp: $!";
-    <$fh>;	# set $. = 1
-    is( <$fh>, undef );
+    open F, 'Io_argv1.tmp' or die "Could not open Io_argv1.tmp: $!";
+    <F>;	# set $. = 1
+    is( <F>, undef );
 
-    skip_if_miniperl($no_devnull, 5);
+    open F, $devnull or die;
+    ok( defined(<F>) );
 
-    open $fh, $devnull or die;
-    ok( defined(<$fh>) );
+    is( <F>, undef );
+    is( <F>, undef );
 
-    is( <$fh>, undef );
-    is( <$fh>, undef );
-
-    open $fh, $devnull or die;	# restart cycle again
-    ok( defined(<$fh>) );
-    is( <$fh>, undef );
-    close $fh or die "Could not close: $!";
+    open F, $devnull or die;	# restart cycle again
+    ok( defined(<F>) );
+    is( <F>, undef );
+    close F or die "Could not close: $!";
 }
 
 # This used to dump core
@@ -148,6 +137,6 @@ unlink "Io_argv3.tmp";
 **PROG**
 
 END {
-    unlink_all 'Io_argv1.tmp', 'Io_argv1.tmp_bak',
+    1 while unlink 'Io_argv1.tmp', 'Io_argv1.tmp_bak',
 	'Io_argv2.tmp', 'Io_argv2.tmp_bak', 'Io_argv3.tmp';
 }

@@ -1,5 +1,3 @@
-#define PERL_NO_GET_CONTEXT
-
 #include "EXTERN.h"
 #include "perl.h"
 #include "XSUB.h"
@@ -23,21 +21,16 @@ START_MY_CXT
 #else
 static int
 errfunc(const char *foo, int bar) {
-  PERL_UNUSED_ARG(foo);
   return !(bar == EACCES || bar == ENOENT || bar == ENOTDIR);
 }
 #endif
 
 MODULE = File::Glob		PACKAGE = File::Glob
 
-int
-GLOB_ERROR()
-    PREINIT:
-	dMY_CXT;
-    CODE:
-	RETVAL = GLOB_ERROR;
-    OUTPUT:
-	RETVAL
+BOOT:
+{
+    MY_CXT_INIT;
+}
 
 void
 doglob(pattern,...)
@@ -52,19 +45,13 @@ PREINIT:
 PPCODE:
     {
 	dMY_CXT;
-	dXSI32;
 
 	/* allow for optional flags argument */
 	if (items > 1) {
 	    flags = (int) SvIV(ST(1));
-	    /* remove unsupported flags */
-	    flags &= ~(GLOB_APPEND | GLOB_DOOFFS | GLOB_ALTDIRFUNC | GLOB_MAGCHAR);
-	} else if (ix) {
-	    flags = (int) SvIV(get_sv("File::Glob::DEFAULT_FLAGS", GV_ADD));
 	}
 
 	/* call glob */
-	memset(&pglob, 0, sizeof(glob_t));
 	retval = bsd_glob(pattern, flags, errfunc, &pglob);
 	GLOB_ERROR = retval;
 
@@ -81,16 +68,5 @@ PPCODE:
 
 	bsd_globfree(&pglob);
     }
-
-BOOT:
-{
-    CV *cv = newXS("File::Glob::bsd_glob", XS_File__Glob_doglob, __FILE__);
-    XSANY.any_i32 = 1;
-}
-
-BOOT:
-{
-    MY_CXT_INIT;
-}
 
 INCLUDE: const-xs.inc

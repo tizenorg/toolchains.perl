@@ -8,16 +8,12 @@ BEGIN {
     }
 }
 
-use Test::More tests => 66;
+BEGIN { require "../../t/test.pl"; }
+plan(tests => 66);
 
 use POSIX qw(fcntl_h signal_h limits_h _exit getcwd open read strftime write
 	     errno);
 use strict 'subs';
-
-sub next_test {
-    my $builder = Test::More->builder;
-    $builder->current_test($builder->current_test() + 1);
-}
 
 $| = 1;
 

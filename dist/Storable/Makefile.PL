@@ -15,9 +15,6 @@ WriteMakefile(
 #    PREREQ_PM           => { 'Test::More' => '0.41' },
     INSTALLDIRS		=> $] >= 5.007 ? 'perl' : 'site',
     VERSION_FROM        => 'Storable.pm',
-    META_MERGE          => { resources =>
-                               { bugtracker => 'http://rt.perl.org/perlbug/' }
-                           },
     dist                => { SUFFIX => 'gz', COMPRESS => 'gzip -f' },
 );
 

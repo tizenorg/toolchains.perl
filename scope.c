@@ -77,7 +77,7 @@ Perl_cxinc(pTHX)
     dVAR;
     const IV old_max = cxstack_max;
     cxstack_max = GROW(cxstack_max);
-    Renew(cxstack, cxstack_max + 1, PERL_CONTEXT);
+    Renew(cxstack, cxstack_max + 1, PERL_CONTEXT);	/* XXX should fix CXINC macro */
     /* Without any kind of initialising deep enough recursion
      * will end up reading uninitialised PERL_CONTEXTs. */
     PoisonNew(cxstack + old_max + 1, cxstack_max - old_max, PERL_CONTEXT);
@@ -183,11 +183,13 @@ S_save_scalar_at(pTHX_ SV **sptr, const U32 flags)
 
     if (SvTYPE(osv) >= SVt_PVMG && SvMAGIC(osv) && SvTYPE(osv) != SVt_PVGV) {
 	if (SvGMAGICAL(osv)) {
+	    const bool oldtainted = PL_tainted;
 	    SvFLAGS(osv) |= (SvFLAGS(osv) &
 	       (SVp_IOK|SVp_NOK|SVp_POK)) >> PRIVSHIFT;
+	    PL_tainted = oldtainted;
 	}
 	if (!(flags & SAVEf_KEEPOLDELEM))
-	    mg_localize(osv, sv, cBOOL(flags & SAVEf_SETMAGIC));
+	    mg_localize(osv, sv, (flags & SAVEf_SETMAGIC) != 0);
     }
 
     return sv;
@@ -200,7 +202,7 @@ Perl_save_pushptrptr(pTHX_ void *const ptr1, void *const ptr2, const int type)
     SSCHECK(3);
     SSPUSHPTR(ptr1);
     SSPUSHPTR(ptr2);
-    SSPUSHUV(type);
+    SSPUSHINT(type);
 }
 
 SV *
@@ -269,7 +271,7 @@ Perl_save_set_svflags(pTHX_ SV* sv, U32 mask, U32 val)
     SSPUSHPTR(sv);
     SSPUSHINT(mask);
     SSPUSHINT(val);
-    SSPUSHUV(SAVEt_SET_SVFLAGS);
+    SSPUSHINT(SAVEt_SET_SVFLAGS);
 }
 
 void
@@ -298,7 +300,7 @@ Perl_save_gp(pTHX_ GV *gv, I32 empty)
 	    gp->gp_sv = newSV(0);
 	}
 #endif
-	GvGP_set(gv,gp);
+	GvGP(gv) = gp;
     }
     else {
 	gp_ref(GvGP(gv));
@@ -363,9 +365,10 @@ Perl_save_bool(pTHX_ bool *boolp)
 
     PERL_ARGS_ASSERT_SAVE_BOOL;
 
-    SSCHECK(2);
+    SSCHECK(3);
+    SSPUSHBOOL(*boolp);
     SSPUSHPTR(boolp);
-    SSPUSHUV(SAVEt_BOOL | (*boolp << 8));
+    SSPUSHINT(SAVEt_BOOL);
 }
 
 void
@@ -375,23 +378,17 @@ Perl_save_pushi32ptr(pTHX_ const I32 i, void *const ptr, const int type)
     SSCHECK(3);
     SSPUSHINT(i);
     SSPUSHPTR(ptr);
-    SSPUSHUV(type);
+    SSPUSHINT(type);
 }
 
 void
 Perl_save_int(pTHX_ int *intp)
 {
     dVAR;
-    const UV shifted = (UV)*intp << SAVE_TIGHT_SHIFT;
 
     PERL_ARGS_ASSERT_SAVE_INT;
 
-    if ((int)(shifted >> SAVE_TIGHT_SHIFT) == *intp) {
-	SSCHECK(2);
-	SSPUSHPTR(intp);
-	SSPUSHUV(SAVEt_INT_SMALL | shifted);
-    } else
-	save_pushi32ptr(*intp, intp, SAVEt_INT);
+    save_pushi32ptr(*intp, intp, SAVEt_INT);
 }
 
 void
@@ -401,9 +398,7 @@ Perl_save_I8(pTHX_ I8 *bytep)
 
     PERL_ARGS_ASSERT_SAVE_I8;
 
-    SSCHECK(2);
-    SSPUSHPTR(bytep);
-    SSPUSHUV(SAVEt_I8 | ((UV)*bytep << 8));
+    save_pushi32ptr(*bytep, bytep, SAVEt_I8);
 }
 
 void
@@ -413,25 +408,17 @@ Perl_save_I16(pTHX_ I16 *intp)
 
     PERL_ARGS_ASSERT_SAVE_I16;
 
-    SSCHECK(2);
-    SSPUSHPTR(intp);
-    SSPUSHUV(SAVEt_I16 | ((UV)*intp << 8));
+    save_pushi32ptr(*intp, intp, SAVEt_I16);
 }
 
 void
 Perl_save_I32(pTHX_ I32 *intp)
 {
     dVAR;
-    const UV shifted = (UV)*intp << SAVE_TIGHT_SHIFT;
 
     PERL_ARGS_ASSERT_SAVE_I32;
 
-    if ((I32)(shifted >> SAVE_TIGHT_SHIFT) == *intp) {
-	SSCHECK(2);
-	SSPUSHPTR(intp);
-	SSPUSHUV(SAVEt_I32_SMALL | shifted);
-    } else
-	save_pushi32ptr(*intp, intp, SAVEt_I32);
+    save_pushi32ptr(*intp, intp, SAVEt_I32);
 }
 
 /* Cannot use save_sptr() to store a char* since the SV** cast will
@@ -476,7 +463,7 @@ Perl_save_padsv_and_mortalize(pTHX_ PADOFFSET off)
     SSPUSHPTR(SvREFCNT_inc_simple_NN(PL_curpad[off]));
     SSPUSHPTR(PL_comppad);
     SSPUSHLONG((long)off);
-    SSPUSHUV(SAVEt_PADSV_AND_MORTALIZE);
+    SSPUSHINT(SAVEt_PADSV_AND_MORTALIZE);
 }
 
 void
@@ -505,25 +492,20 @@ Perl_save_pushptr(pTHX_ void *const ptr, const int type)
     dVAR;
     SSCHECK(2);
     SSPUSHPTR(ptr);
-    SSPUSHUV(type);
+    SSPUSHINT(type);
 }
 
 void
 Perl_save_clearsv(pTHX_ SV **svp)
 {
     dVAR;
-    const UV offset = svp - PL_curpad;
-    const UV offset_shifted = offset << SAVE_TIGHT_SHIFT;
 
     PERL_ARGS_ASSERT_SAVE_CLEARSV;
 
     ASSERT_CURPAD_ACTIVE("save_clearsv");
-    if ((offset_shifted >> SAVE_TIGHT_SHIFT) != offset)
-	Perl_croak(aTHX_ "panic: pad offset %"UVuf" out of range (%p-%p)",
-		   offset, svp, PL_curpad);
-
-    SSCHECK(1);
-    SSPUSHUV(offset_shifted | SAVEt_CLEARSV);
+    SSCHECK(2);
+    SSPUSHLONG((long)(svp-PL_curpad));
+    SSPUSHINT(SAVEt_CLEARSV);
     SvPADSTALE_off(*svp); /* mark lexical as active */
 }
 
@@ -573,7 +555,7 @@ Perl_save_destructor(pTHX_ DESTRUCTORFUNC_NOCONTEXT_t f, void* p)
     SSCHECK(3);
     SSPUSHDPTR(f);
     SSPUSHPTR(p);
-    SSPUSHUV(SAVEt_DESTRUCTOR);
+    SSPUSHINT(SAVEt_DESTRUCTOR);
 }
 
 void
@@ -583,19 +565,24 @@ Perl_save_destructor_x(pTHX_ DESTRUCTORFUNC_t f, void* p)
     SSCHECK(3);
     SSPUSHDXPTR(f);
     SSPUSHPTR(p);
-    SSPUSHUV(SAVEt_DESTRUCTOR_X);
+    SSPUSHINT(SAVEt_DESTRUCTOR_X);
 }
 
 void
 Perl_save_hints(pTHX)
 {
     dVAR;
-    COPHH *save_cophh = cophh_copy(CopHINTHASH_get(&PL_compiling));
+    if (PL_compiling.cop_hints_hash) {
+	HINTS_REFCNT_LOCK;
+	    PL_compiling.cop_hints_hash->refcounted_he_refcnt++;
+	    HINTS_REFCNT_UNLOCK;
+    }
     if (PL_hints & HINT_LOCALIZE_HH) {
-	save_pushptri32ptr(GvHV(PL_hintgv), PL_hints, save_cophh, SAVEt_HINTS);
-	GvHV(PL_hintgv) = hv_copy_hints_hv(GvHV(PL_hintgv));
+	save_pushptri32ptr(GvHV(PL_hintgv), PL_hints,
+			   PL_compiling.cop_hints_hash, SAVEt_HINTS);
+	GvHV(PL_hintgv) = Perl_hv_copy_hints_hv(aTHX_ GvHV(PL_hintgv));
     } else {
-	save_pushi32ptr(PL_hints, save_cophh, SAVEt_HINTS);
+	save_pushi32ptr(PL_hints, PL_compiling.cop_hints_hash, SAVEt_HINTS);
     }
 }
 
@@ -607,7 +594,7 @@ S_save_pushptri32ptr(pTHX_ void *const ptr1, const I32 i, void *const ptr2,
     SSPUSHPTR(ptr1);
     SSPUSHINT(i);
     SSPUSHPTR(ptr2);
-    SSPUSHUV(type);
+    SSPUSHINT(type);
 }
 
 void
@@ -632,7 +619,7 @@ Perl_save_aelem_flags(pTHX_ AV *av, I32 idx, SV **sptr, const U32 flags)
      * won't actually be stored in the array - so it won't get
      * reaped when the localize ends. Ensure it gets reaped by
      * mortifying it instead. DAPM */
-    if (SvTIED_mg((const SV *)av, PERL_MAGIC_tied))
+    if (SvTIED_mg(sv, PERL_MAGIC_tiedelem))
 	sv_2mortal(sv);
 }
 
@@ -649,7 +636,7 @@ Perl_save_helem_flags(pTHX_ HV *hv, SV *key, SV **sptr, const U32 flags)
     SSPUSHPTR(SvREFCNT_inc_simple(hv));
     SSPUSHPTR(newSVsv(key));
     SSPUSHPTR(SvREFCNT_inc(*sptr));
-    SSPUSHUV(SAVEt_HELEM);
+    SSPUSHINT(SAVEt_HELEM);
     save_scalar_at(sptr, flags);
     if (flags & SAVEf_KEEPOLDELEM)
 	return;
@@ -658,7 +645,7 @@ Perl_save_helem_flags(pTHX_ HV *hv, SV *key, SV **sptr, const U32 flags)
      * won't actually be stored in the hash - so it won't get
      * reaped when the localize ends. Ensure it gets reaped by
      * mortifying it instead. DAPM */
-    if (SvTIED_mg((const SV *)hv, PERL_MAGIC_tied))
+    if (SvTIED_mg(sv, PERL_MAGIC_tiedelem))
 	sv_2mortal(sv);
 }
 
@@ -680,17 +667,13 @@ Perl_save_alloc(pTHX_ I32 size, I32 pad)
     dVAR;
     register const I32 start = pad + ((char*)&PL_savestack[PL_savestack_ix]
 				- (char*)PL_savestack);
-    const UV elems = 1 + ((size + pad - 1) / sizeof(*PL_savestack));
-    const UV elems_shifted = elems << SAVE_TIGHT_SHIFT;
+    register const I32 elems = 1 + ((size + pad - 1) / sizeof(*PL_savestack));
 
-    if ((elems_shifted >> SAVE_TIGHT_SHIFT) != elems)
-	Perl_croak(aTHX_ "panic: save_alloc elems %"UVuf" out of range (%ld-%ld)",
-		   elems, size, pad);
-
-    SSGROW(elems + 1);
+    SSGROW(elems + 2);
 
     PL_savestack_ix += elems;
-    SSPUSHUV(SAVEt_ALLOC | elems_shifted);
+    SSPUSHINT(elems);
+    SSPUSHINT(SAVEt_ALLOC);
     return start;
 }
 
@@ -711,14 +694,10 @@ Perl_leave_scope(pTHX_ I32 base)
 
     if (base < -1)
 	Perl_croak(aTHX_ "panic: corrupt saved stack index");
-    DEBUG_l(Perl_deb(aTHX_ "savestack: releasing items %ld -> %ld\n",
-			(long)PL_savestack_ix, (long)base));
     while (PL_savestack_ix > base) {
-	UV uv = SSPOPUV;
-	const U8 type = (U8)uv & SAVE_MASK;
 	TAINT_NOT;
 
-	switch (type) {
+	switch (SSPOPINT) {
 	case SAVEt_ITEM:			/* normal string */
 	    value = MUTABLE_SV(SSPOPPTR);
 	    sv = MUTABLE_SV(SSPOPPTR);
@@ -763,15 +742,9 @@ Perl_leave_scope(pTHX_ I32 base)
 		*(char**)ptr = str;
 	    }
 	    break;
-	case SAVEt_GVSV:			/* scalar slot in GV */
-	    value = MUTABLE_SV(SSPOPPTR);
-	    gv = MUTABLE_GV(SSPOPPTR);
-	    ptr = &GvSV(gv);
-	    goto restore_svp;
 	case SAVEt_GENERIC_SVREF:		/* generic sv */
 	    value = MUTABLE_SV(SSPOPPTR);
 	    ptr = SSPOPPTR;
-	restore_svp:
 	    sv = *(SV**)ptr;
 	    *(SV**)ptr = value;
 	    SvREFCNT_dec(sv);
@@ -799,21 +772,13 @@ Perl_leave_scope(pTHX_ I32 base)
 		PL_localizing = 0;
 	    }
 	    break;
-	case SAVEt_INT_SMALL:
-	    ptr = SSPOPPTR;
-	    *(int*)ptr = (int)(uv >> SAVE_TIGHT_SHIFT);
-	    break;
 	case SAVEt_INT:				/* int reference */
 	    ptr = SSPOPPTR;
 	    *(int*)ptr = (int)SSPOPINT;
 	    break;
 	case SAVEt_BOOL:			/* bool reference */
 	    ptr = SSPOPPTR;
-	    *(bool*)ptr = cBOOL(uv >> 8);
-	    break;
-	case SAVEt_I32_SMALL:
-	    ptr = SSPOPPTR;
-	    *(I32*)ptr = (I32)(uv >> SAVE_TIGHT_SHIFT);
+	    *(bool*)ptr = (bool)SSPOPBOOL;
 	    break;
 	case SAVEt_I32:				/* I32 reference */
 	    ptr = SSPOPPTR;
@@ -848,19 +813,15 @@ Perl_leave_scope(pTHX_ I32 base)
 	    ptr = SSPOPPTR;
 	    gv = MUTABLE_GV(SSPOPPTR);
 	    gp_free(gv);
-	    GvGP_set(gv, (GP*)ptr);
+	    GvGP(gv) = (GP*)ptr;
             /* putting a method back into circulation ("local")*/
-	    if (GvCVu(gv) && (hv=GvSTASH(gv)) && HvENAME_get(hv))
+	    if (GvCVu(gv) && (hv=GvSTASH(gv)) && HvNAME_get(hv))
                 mro_method_changed_in(hv);
 	    SvREFCNT_dec(gv);
 	    break;
 	case SAVEt_FREESV:
 	    ptr = SSPOPPTR;
 	    SvREFCNT_dec(MUTABLE_SV(ptr));
-	    break;
-	case SAVEt_FREECOPHH:
-	    ptr = SSPOPPTR;
-	    cophh_free((COPHH *)ptr);
 	    break;
 	case SAVEt_MORTALIZESV:
 	    ptr = SSPOPPTR;
@@ -876,7 +837,7 @@ Perl_leave_scope(pTHX_ I32 base)
 	    Safefree(ptr);
 	    break;
 	case SAVEt_CLEARSV:
-	    ptr = (void*)&PL_curpad[uv >> SAVE_TIGHT_SHIFT];
+	    ptr = (void*)&PL_curpad[SSPOPLONG];
 	    sv = *(SV**)ptr;
 
 	    DEBUG_Xv(PerlIO_printf(Perl_debug_log,
@@ -952,9 +913,9 @@ Perl_leave_scope(pTHX_ I32 base)
 	    (*SSPOPDXPTR)(aTHX_ ptr);
 	    break;
 	case SAVEt_REGCONTEXT:
-	    /* regexp must have croaked */
 	case SAVEt_ALLOC:
-	    PL_savestack_ix -= uv >> SAVE_TIGHT_SHIFT;
+	    i = SSPOPINT;
+	    PL_savestack_ix -= i;  	/* regexp must have croaked */
 	    break;
 	case SAVEt_STACK_POS:		/* Position on Perl stack */
 	    i = SSPOPINT;
@@ -1009,8 +970,8 @@ Perl_leave_scope(pTHX_ I32 base)
 		SvREFCNT_dec(MUTABLE_SV(GvHV(PL_hintgv)));
 		GvHV(PL_hintgv) = NULL;
 	    }
-	    cophh_free(CopHINTHASH_get(&PL_compiling));
-	    CopHINTHASH_set(&PL_compiling, (COPHH*)SSPOPPTR);
+	    Perl_refcounted_he_free(aTHX_ PL_compiling.cop_hints_hash);
+	    PL_compiling.cop_hints_hash = (struct refcounted_he *) SSPOPPTR;
 	    *(I32*)&PL_hints = (I32)SSPOPINT;
 	    if (PL_hints & HINT_LOCALIZE_HH) {
 		SvREFCNT_dec(MUTABLE_SV(GvHV(PL_hintgv)));
@@ -1102,11 +1063,11 @@ Perl_leave_scope(pTHX_ I32 base)
 
 	case SAVEt_I16:				/* I16 reference */
 	    ptr = SSPOPPTR;
-	    *(I16*)ptr = (I16)(uv >> 8);
+	    *(I16*)ptr = (I16)SSPOPINT;
 	    break;
 	case SAVEt_I8:				/* I8 reference */
 	    ptr = SSPOPPTR;
-	    *(I8*)ptr = (I8)(uv >> 8);
+	    *(I8*)ptr = (I8)SSPOPINT;
 	    break;
 	case SAVEt_DESTRUCTOR:
 	    ptr = SSPOPPTR;
@@ -1152,8 +1113,6 @@ Perl_leave_scope(pTHX_ I32 base)
     }
 
     PL_tainted = was;
-
-    PERL_ASYNC_CHECK();
 }
 
 void
@@ -1226,6 +1185,8 @@ Perl_cx_dump(pTHX_ PERL_CONTEXT *cx)
 		(long)cx->blk_loop.resetsp);
 	PerlIO_printf(Perl_debug_log, "BLK_LOOP.MY_OP = 0x%"UVxf"\n",
 		PTR2UV(cx->blk_loop.my_op));
+	PerlIO_printf(Perl_debug_log, "BLK_LOOP.NEXT_OP = 0x%"UVxf"\n",
+		PTR2UV(CX_LOOP_NEXTOP_GET(cx)));
 	/* XXX: not accurate for LAZYSV/IV */
 	PerlIO_printf(Perl_debug_log, "BLK_LOOP.ITERARY = 0x%"UVxf"\n",
 		PTR2UV(cx->blk_loop.state_u.ary.ary));

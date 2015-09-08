@@ -7,9 +7,11 @@
 # You may copy and distribute this program under the
 # same terms as Perl itself.  If in doubt, 
 # write to mjd-perl-memoize+@plover.com for a license.
+#
+# Version 1.01 $Revision: 1.18 $ $Date: 2001/06/24 17:16:47 $
 
 package Memoize;
-$VERSION = '1.02';
+$VERSION = '1.01_03';
 
 # Compile-time constants
 sub SCALAR () { 0 } 
@@ -264,9 +266,9 @@ sub _memoizer {
       # Otherwise, we cached an array containing the returned list:
       return @$val;
     } else {
-      my @q = &{$info->{U}}(@_);
-      $cache->{$argstr} = $info->{O}{LIST_CACHE} eq 'MERGE' ? $q [0] : \@q;
-      @q;
+        my @q = &{$info->{U}}(@_);
+        $cache->{$argstr} = $info->{O}{LIST_CACHE} eq 'MERGE' ? $q [0] : \@q;
+        @q;
     }
   } else {
     croak "Internal error \#42; context was neither LIST nor SCALAR\n";
@@ -360,7 +362,7 @@ Memoize - Make functions faster by trading space for time
 
 =head1 SYNOPSIS
 
-        # This is the documentation for Memoize 1.02
+        # This is the documentation for Memoize 1.01
 	use Memoize;
 	memoize('slow_function');
 	slow_function(arguments);    # Is faster than it was before

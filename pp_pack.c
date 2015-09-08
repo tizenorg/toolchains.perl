@@ -645,7 +645,7 @@ uni_to_byte(pTHX_ const char **s, const char *end, I32 datumtype)
     STRLEN retlen;
     UV val = utf8n_to_uvchr((U8 *) *s, end-*s, &retlen,
 			 ckWARN(WARN_UTF8) ? 0 : UTF8_ALLOW_ANY);
-    /* We try to process malformed UTF-8 as much as possible (preferably with
+    /* We try to process malformed UTF-8 as much as possible (preferrably with
        warnings), but these two mean we make no progress in the string and
        might enter an infinite loop */
     if (retlen == (STRLEN) -1 || retlen == 0)
@@ -1225,7 +1225,7 @@ STATIC I32
 S_unpack_rec(pTHX_ tempsym_t* symptr, const char *s, const char *strbeg, const char *strend, const char **new_s )
 {
     dVAR; dSP;
-    SV *sv = NULL;
+    SV *sv;
     const I32 start_sp_offset = SP - PL_stack_base;
     howlen_t howlen;
     I32 checksum = 0;
@@ -1558,15 +1558,13 @@ S_unpack_rec(pTHX_ tempsym_t* symptr, const char *s, const char *strbeg, const c
 	}
 	case 'H':
 	case 'h': {
-	    char *str = NULL;
+	    char *str;
 	    /* Preliminary length estimate, acceptable for utf8 too */
 	    if (howlen == e_star || len > (strend - s) * 2)
 		len = (strend - s) * 2;
-	    if (!checksum) {
-		sv = sv_2mortal(newSV(len ? len : 1));
-		SvPOK_on(sv);
-		str = SvPVX(sv);
-	    }
+	    sv = sv_2mortal(newSV(len ? len : 1));
+	    SvPOK_on(sv);
+	    str = SvPVX(sv);
 	    if (datumtype == 'h') {
 		U8 bits = 0;
 		I32 ai32 = len;
@@ -1576,8 +1574,7 @@ S_unpack_rec(pTHX_ tempsym_t* symptr, const char *s, const char *strbeg, const c
 			if (s >= strend) break;
 			bits = uni_to_byte(aTHX_ &s, strend, datumtype);
 		    } else bits = * (U8 *) s++;
-		    if (!checksum)
-			*str++ = PL_hexdigit[bits & 15];
+		    *str++ = PL_hexdigit[bits & 15];
 		}
 	    } else {
 		U8 bits = 0;
@@ -1588,15 +1585,12 @@ S_unpack_rec(pTHX_ tempsym_t* symptr, const char *s, const char *strbeg, const c
 			if (s >= strend) break;
 			bits = uni_to_byte(aTHX_ &s, strend, datumtype);
 		    } else bits = *(U8 *) s++;
-		    if (!checksum)
-			*str++ = PL_hexdigit[(bits >> 4) & 15];
+		    *str++ = PL_hexdigit[(bits >> 4) & 15];
 		}
 	    }
-	    if (!checksum) {
-		*str = '\0';
-		SvCUR_set(sv, str - SvPVX_const(sv));
-		XPUSHs(sv);
-	    }
+	    *str = '\0';
+	    SvCUR_set(sv, str - SvPVX_const(sv));
+	    XPUSHs(sv);
 	    break;
 	}
 	case 'C':
@@ -1660,7 +1654,7 @@ S_unpack_rec(pTHX_ tempsym_t* symptr, const char *s, const char *strbeg, const c
 	    break;
 	case 'U':
 	    if (len == 0) {
-                if (explicit_length && howlen != e_star) {
+                if (explicit_length) {
 		    /* Switch to "bytes in UTF-8" mode */
 		    if (symptr->flags & FLAG_DO_UTF8) utf8 = 0;
 		    else
@@ -1759,7 +1753,7 @@ S_unpack_rec(pTHX_ tempsym_t* symptr, const char *s, const char *strbeg, const c
 	    }
 	    break;
 #else
-            /* Fallthrough! */
+            /* Fallhrough! */
 #endif
 	case 'v':
 	case 'n':
@@ -2129,7 +2123,7 @@ S_unpack_rec(pTHX_ tempsym_t* symptr, const char *s, const char *strbeg, const c
 	    break;
 #endif
 	case 'u':
-	    if (!checksum) {
+	    {
                 const STRLEN l = (STRLEN) (strend - s) * 3 / 4;
 		sv = sv_2mortal(newSV(l));
 		if (l) SvPOK_on(sv);
@@ -2147,8 +2141,7 @@ S_unpack_rec(pTHX_ tempsym_t* symptr, const char *s, const char *strbeg, const c
 			hunk[0] = (char)((a << 2) | (b >> 4));
 			hunk[1] = (char)((b << 4) | (c >> 2));
 			hunk[2] = (char)((c << 6) | d);
-			if (!checksum)
-			    sv_catpvn(sv, hunk, (len > 3) ? 3 : len);
+			sv_catpvn(sv, hunk, (len > 3) ? 3 : len);
 			len -= 3;
 		    }
 		    if (s < strend) {
@@ -2189,8 +2182,7 @@ S_unpack_rec(pTHX_ tempsym_t* symptr, const char *s, const char *strbeg, const c
 			hunk[0] = (char)((a << 2) | (b >> 4));
 			hunk[1] = (char)((b << 4) | (c >> 2));
 			hunk[2] = (char)((c << 6) | d);
-			if (!checksum)
-			    sv_catpvn(sv, hunk, (len > 3) ? 3 : len);
+			sv_catpvn(sv, hunk, (len > 3) ? 3 : len);
 			len -= 3;
 		    }
 		    if (*s == '\n')
@@ -2200,8 +2192,7 @@ S_unpack_rec(pTHX_ tempsym_t* symptr, const char *s, const char *strbeg, const c
 			    s += 2;
 		}
 	    }
-	    if (!checksum)
-		XPUSHs(sv);
+	    XPUSHs(sv);
 	    break;
 	}
 
@@ -3184,12 +3175,7 @@ extern const double _double_constants[];
 	    Zero(&anv, 1, NV); /* can be long double with unused bits */
 	    while (len-- > 0) {
 		fromstr = NEXTFROM;
-#ifdef __GNUC__
-		/* to work round a gcc/x86 bug; don't use SvNV */
-		anv.nv = sv_2nv(fromstr);
-#else
 		anv.nv = SvNV(fromstr);
-#endif
 		DO_BO_PACK_N(anv, NV);
 		PUSH_BYTES(utf8, cur, anv.bytes, sizeof(anv.bytes));
 	    }
@@ -3202,12 +3188,7 @@ extern const double _double_constants[];
 	    Zero(&aldouble, 1, long double);
 	    while (len-- > 0) {
 		fromstr = NEXTFROM;
-#  ifdef __GNUC__
-		/* to work round a gcc/x86 bug; don't use SvNV */
-		aldouble.ld = (long double)sv_2nv(fromstr);
-#  else
 		aldouble.ld = (long double)SvNV(fromstr);
-#  endif
 		DO_BO_PACK_N(aldouble, long double);
 		PUSH_BYTES(utf8, cur, aldouble.bytes, sizeof(aldouble.bytes));
 	    }
@@ -3363,7 +3344,7 @@ extern const double _double_constants[];
 		    goto w_string;
 		else if (SvNOKp(fromstr)) {
 		    /* 10**NV_MAX_10_EXP is the largest power of 10
-		       so 10**(NV_MAX_10_EXP+1) is definitely unrepresentable
+		       so 10**(NV_MAX_10_EXP+1) is definately unrepresentable
 		       given 10**(NV_MAX_10_EXP+1) == 128 ** x solve for x:
 		       x = (NV_MAX_10_EXP+1) * log (10) / log (128)
 		       And with that many bytes only Inf can overflow.

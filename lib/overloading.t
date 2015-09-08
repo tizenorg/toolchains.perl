@@ -1,6 +1,14 @@
 #./perl
 
-use Test::More tests => 35;
+BEGIN {
+    chdir 't' if -d 't';
+    @INC = '../lib';
+}
+
+BEGIN {
+    require "./test.pl";
+    plan(tests => 35);
+}
 
 use Scalar::Util qw(refaddr);
 

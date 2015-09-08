@@ -66,7 +66,7 @@ WriteMakefile(
     NAME         => 'Compress::Raw::Zlib',
     VERSION_FROM => 'lib/Compress/Raw/Zlib.pm',
     INC          => "-I$ZLIB_INCLUDE" ,
-    DEFINE       => "-DNO_VIZ $OLD_ZLIB $WALL -DGZIP_OS_CODE=$GZIP_OS_CODE $USE_PPPORT_H" ,
+    DEFINE       => "$OLD_ZLIB $WALL -DGZIP_OS_CODE=$GZIP_OS_CODE $USE_PPPORT_H" ,
     XS           => { 'Zlib.xs' => 'Zlib.c'},
     'depend'     => { 'Makefile'   => 'config.in' },
     'clean'      => { FILES        => '*.c constants.h constants.xs' },
@@ -88,14 +88,6 @@ WriteMakefile(
         ('LICENSE'  => 'perl')         : ()),    
 
 ) ;
-
-sub version_Macro
-{
-    my $ver = shift ;
-
-    return [ "#if ZLIB_VERNUM >= 0x$ver\n", "#endif\n" ];
-}
-
 
 my @names = qw(
 
@@ -137,13 +129,9 @@ my @names = qw(
 );
     #ZLIB_VERNUM
 
-my %verSpecificNames = (
-    Z_TREES => '1240',
-);
-
 if (eval {require ExtUtils::Constant; 1}) {
     # Check the constants above all appear in @EXPORT in Zlib.pm
-    my %names = %verSpecificNames, map { $_, 1} @names, 'ZLIB_VERSION';
+    my %names = map { $_, 1} @names, 'ZLIB_VERSION';
     open F, "<lib/Compress/Raw/Zlib.pm" or die "Cannot open Zlib.pm: $!\n";
     while (<F>)
     {
@@ -165,13 +153,7 @@ if (eval {require ExtUtils::Constant; 1}) {
             "\t$missing\n" ;
     }
     
-    push @names, { name => 'ZLIB_VERSION', type => 'PV' };
-    
-    push @names, map { { name => $_, 
-                         macro => version_Macro $verSpecificNames{$_} 
-                       } 
-                     } 
-                 keys %verSpecificNames ;
+    push @names, {name => 'ZLIB_VERSION', type => 'PV' };
 
     ExtUtils::Constant::WriteConstants(
                                      NAME => 'Zlib',
@@ -180,7 +162,6 @@ if (eval {require ExtUtils::Constant; 1}) {
                                      XS_FILE  => 'constants.xs',
                                                                        
                                     );
-
 } 
 else {
     foreach my $name (qw( constants.h constants.xs ))

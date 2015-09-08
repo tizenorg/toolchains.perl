@@ -1,7 +1,7 @@
 #!perl -w
 
 use strict;
-use Test::More;
+use Test::More 'no_plan';
 use Encode;
 
 use XS::APItest qw(utf16_to_utf8 utf16_to_utf8_reversed);
@@ -63,4 +63,3 @@ like($@, qr/^Malformed UTF-16 surrogate at/, 'Lone surrogate croaks');
 (ok(!defined $got, 'hence eval returns undef')) or
     diag(join ', ', map {ord $_} split //, $got);
 
-done_testing;

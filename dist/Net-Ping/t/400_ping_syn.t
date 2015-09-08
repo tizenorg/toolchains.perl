@@ -1,5 +1,3 @@
-use strict;
-
 BEGIN {
   if ($ENV{PERL_CORE}) {
     unless ($ENV{PERL_TEST_Net_Ping}) {
@@ -33,9 +31,7 @@ BEGIN {
 # $ PERL_CORE=1 make test
 
 # Try a few remote servers
-my %webs;
-BEGIN {
-  %webs = (
+my $webs = {
   # Hopefully this is never a routeable host
   "172.29.249.249" => 0,
 
@@ -47,12 +43,15 @@ BEGIN {
   "www.about.com." => 1,
   "www.microsoft.com." => 1,
   "127.0.0.1" => 1,
-);
-}
+};
 
-use Test::More tests => 3 + 2 * keys %webs;
+use strict;
+use Test;
+use Net::Ping;
+plan tests => ((keys %{ $webs }) * 2 + 3);
 
-BEGIN {use_ok('Net::Ping')};
+# Everything loaded fine
+ok 1;
 
 my $can_alarm = eval {alarm 0; 1;};
 
@@ -62,32 +61,39 @@ sub Alarm {
 
 Alarm(50);
 $SIG{ALRM} = sub {
-  fail('Alarm timed out');
+  ok 0;
   die "TIMED OUT!";
 };
 
 my $p = new Net::Ping "syn", 10;
 
-isa_ok($p, 'Net::Ping', 'new() worked');
+# new() worked?
+ok !!$p;
 
 # Change to use the more common web port.
 # (Make sure getservbyname works in scalar context.)
-cmp_ok(($p->{port_num} = getservbyname("http", "tcp")), '>', 0, 'valid port');
+ok ($p -> {port_num} = getservbyname("http", "tcp"));
 
-foreach my $host (keys %webs) {
+foreach my $host (keys %{ $webs }) {
   # ping() does dns resolution and
   # only sends the SYN at this point
   Alarm(50); # (Plenty for a DNS lookup)
-  is($p->ping($host), 1, "Can reach $host $p->{bad}->{$host}");
+  if (!ok $p -> ping($host)) {
+    print STDERR "CANNOT RESOLVE $host $p->{bad}->{$host}\n";
+  }
 }
 
 Alarm(20);
 while (my $host = $p->ack()) {
-  is($webs{$host}, 1, "supposed to be up: http://$host/");
-  delete $webs{$host};
+  if (!ok $webs->{$host}) {
+    print STDERR "SUPPOSED TO BE DOWN: http://$host/\n";
+  }
+  delete $webs->{$host};
 }
 
 Alarm(0);
-foreach my $host (keys %webs) {
-  is($webs{$host}, 0, "supposed to be down: http://$host/ [" . ($p->{bad}->{$host} || "") . "]");
+foreach my $host (keys %{ $webs }) {
+  if (!ok !$webs->{$host}) {
+    print STDERR "DOWN: http://$host/ [",($p->{bad}->{$host} || ""),"]\n";
+  }
 }

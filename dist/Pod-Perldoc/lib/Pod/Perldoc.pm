@@ -12,7 +12,7 @@ use File::Spec::Functions qw(catfile catdir splitdir);
 use vars qw($VERSION @Pagers $Bindir $Pod2man
   $Temp_Files_Created $Temp_File_Lifetime
 );
-$VERSION = '3.15_04';
+$VERSION = '3.15_02';
 #..........................................................................
 
 BEGIN {  # Make a DEBUG constant very first thing...
@@ -499,7 +499,7 @@ sub find_good_formatter_class {
       } else {
         $^W = 0;
         # The average user just has no reason to be seeing
-        #  $^W-suppressible warnings from the the require!
+        #  $^W-suppressable warnings from the the require!
       }
 
       eval "require $c";
@@ -746,7 +746,7 @@ sub grand_search_init {
                 for ($i = 0; $trn = $ENV{'DCL$PATH;'.$i}; $i++) {
                     push(@searchdirs,$trn);
                 }
-                push(@searchdirs,'perl_root:[lib.pods]')  # installed pods
+                push(@searchdirs,'perl_root:[lib.pod]')  # installed pods
             }
             else {
                 push(@searchdirs, grep(-d, split($Config{path_sep},
@@ -1128,7 +1128,7 @@ sub render_findings {
     } else {
       $^W = 0;
       # The average user just has no reason to be seeing
-      #  $^W-suppressible warnings from the formatting!
+      #  $^W-suppressable warnings from the formatting!
     }
           
     eval {  $formatter->parse_from_file( $file, $out_fh )  };

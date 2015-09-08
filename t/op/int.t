@@ -3,67 +3,96 @@
 BEGIN {
     chdir 't' if -d 't';
     @INC = '../lib';
-    require './test.pl';
 }
 
-plan 15;
+print "1..14\n";
 
 # compile time evaluation
 
-if (int(1.234) == 1) {pass()} else {fail()}
+if (int(1.234) == 1) {print "ok 1\n";} else {print "not ok 1\n";}
 
-if (int(-1.234) == -1) {pass()} else {fail()}
+if (int(-1.234) == -1) {print "ok 2\n";} else {print "not ok 2\n";}
 
 # run time evaluation
 
 $x = 1.234;
-cmp_ok(int($x), '==', 1);
-cmp_ok(int(-$x), '==', -1);
+if (int($x) == 1) {print "ok 3\n";} else {print "not ok 3\n";}
+if (int(-$x) == -1) {print "ok 4\n";} else {print "not ok 4\n";}
 
 $x = length("abc") % -10;
-cmp_ok($x, '==', -7);
+print $x == -7 ? "ok 5\n" : "# expected -7, got $x\nnot ok 5\n";
 
 {
-    my $fail;
     use integer;
     $x = length("abc") % -10;
     $y = (3/-10)*-10;
-    ok($x+$y == 3) or ++$fail;
-    ok(abs($x) < 10) or ++$fail;
-    if ($fail) {
-	diag("\$x == $x", "\$y == $y");
-    }
+    print $x+$y == 3 && abs($x) < 10 ? "ok 6\n" : "not ok 6\n";
 }
 
+# check bad strings still get converted
+
 @x = ( 6, 8, 10);
-cmp_ok($x["1foo"], '==', 8, 'check bad strings still get converted');
+print "not " if $x["1foo"] != 8;
+print "ok 7\n";
+
+# check values > 32 bits work.
 
 $x = 4294967303.15;
 $y = int ($x);
-is($y, "4294967303", 'check values > 32 bits work');
+
+if ($y eq "4294967303") {
+  print "ok 8\n"
+} else {
+  print "not ok 8 # int($x) is $y, not 4294967303\n"
+}
 
 $y = int (-$x);
 
-is($y, "-4294967303");
+if ($y eq "-4294967303") {
+  print "ok 9\n"
+} else {
+  print "not ok 9 # int($x) is $y, not -4294967303\n"
+}
 
 $x = 4294967294.2;
 $y = int ($x);
 
-is($y, "4294967294");
+if ($y eq "4294967294") {
+  print "ok 10\n"
+} else {
+  print "not ok 10 # int($x) is $y, not 4294967294\n"
+}
 
 $x = 4294967295.7;
 $y = int ($x);
 
-is($y, "4294967295");
+if ($y eq "4294967295") {
+  print "ok 11\n"
+} else {
+  print "not ok 11 # int($x) is $y, not 4294967295\n"
+}
 
 $x = 4294967296.11312;
 $y = int ($x);
 
-is($y, "4294967296");
+if ($y eq "4294967296") {
+  print "ok 12\n"
+} else {
+  print "not ok 12 # int($x) is $y, not 4294967296\n"
+}
 
 $y = int(279964589018079/59);
-cmp_ok($y, '==', 4745162525730);
+if ($y == 4745162525730) {
+  print "ok 13\n"
+} else {
+  print "not ok 13 # int(279964589018079/59) is $y, not 4745162525730\n"
+}
 
 $y = 279964589018079;
 $y = int($y/59);
-cmp_ok($y, '==', 4745162525730);
+if ($y == 4745162525730) {
+  print "ok 14\n"
+} else {
+  print "not ok 14 # int(279964589018079/59) is $y, not 4745162525730\n"
+}
+

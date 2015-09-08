@@ -38,8 +38,6 @@ typedef BOOL (__stdcall *PFNAllocateAndInitializeSid)(PSID_IDENTIFIER_AUTHORITY,
 typedef BOOL (__stdcall *PFNEqualSid)(PSID, PSID);
 typedef void* (__stdcall *PFNFreeSid)(PSID);
 typedef BOOL (__stdcall *PFNIsUserAnAdmin)(void);
-typedef BOOL (WINAPI *PFNGetProductInfo)(DWORD, DWORD, DWORD, DWORD, DWORD*);
-typedef void (WINAPI *PFNGetNativeSystemInfo)(LPSYSTEM_INFO lpSystemInfo);
 
 #ifndef CSIDL_MYMUSIC
 #   define CSIDL_MYMUSIC              0x000D
@@ -793,17 +791,9 @@ XS(w32_GetChipName)
 {
     dXSARGS;
     SYSTEM_INFO sysinfo;
-    HMODULE module;
-    PFNGetNativeSystemInfo pfnGetNativeSystemInfo;
 
     Zero(&sysinfo,1,SYSTEM_INFO);
-    module = GetModuleHandle("kernel32.dll");
-    GETPROC(GetNativeSystemInfo);
-    if (pfnGetNativeSystemInfo)
-        pfnGetNativeSystemInfo(&sysinfo);
-    else
-        GetSystemInfo(&sysinfo);
-
+    GetSystemInfo(&sysinfo);
     /* XXX docs say dwProcessorType is deprecated on NT */
     XSRETURN_IV(sysinfo.dwProcessorType);
 }
@@ -1483,8 +1473,7 @@ XS(w32_GetFullPathName)
             /* fullname is the MAX_PATH+1 sized buffer returned from PerlDir_mapA()
              * or the 2*MAX_PATH sized local buffer in the __CYGWIN__ case.
              */
-            if (lastchar - fullname < MAX_PATH - 1)
-                strcpy(lastchar+1, "\\");
+            strcpy(lastchar+1, "\\");
         }
     }
 
@@ -1520,16 +1509,13 @@ XS(w32_GetLongPathName)
         WCHAR wide_path[MAX_PATH+1];
         WCHAR *long_path;
 
-        if (wcslen(wstr) < countof(wide_path)) {
-            wcscpy(wide_path, wstr);
-            long_path = my_longpathW(wide_path);
-            if (long_path) {
-                Safefree(wstr);
-                ST(0) = wstr_to_sv(aTHX_ long_path);
-                XSRETURN(1);
-            }
-        }
+        wcscpy(wide_path, wstr);
         Safefree(wstr);
+        long_path = my_longpathW(wide_path);
+        if (long_path) {
+            ST(0) = wstr_to_sv(aTHX_ long_path);
+            XSRETURN(1);
+        }
     }
     else {
         SV *path;
@@ -1539,13 +1525,11 @@ XS(w32_GetLongPathName)
 
         path = ST(0);
         pathstr = SvPV(path,len);
-        if (len < sizeof(tmpbuf)) {
-            strcpy(tmpbuf, pathstr);
-            pathstr = my_longpathA(tmpbuf);
-            if (pathstr) {
-                ST(0) = sv_2mortal(newSVpvn(pathstr, strlen(pathstr)));
-                XSRETURN(1);
-            }
+        strcpy(tmpbuf, pathstr);
+        pathstr = my_longpathA(tmpbuf);
+        if (pathstr) {
+            ST(0) = sv_2mortal(newSVpvn(pathstr, strlen(pathstr)));
+            XSRETURN(1);
         }
     }
     XSRETURN_EMPTY;
@@ -1578,19 +1562,14 @@ XS(w32_CopyFile)
 {
     dXSARGS;
     BOOL bResult;
-    char *pszSourceFile;
     char szSourceFile[MAX_PATH+1];
 
     if (items != 3)
 	Perl_croak(aTHX_ "usage: Win32::CopyFile($from, $to, $overwrite)");
-
-    pszSourceFile = PerlDir_mapA(SvPV_nolen(ST(0)));
-    if (strlen(pszSourceFile) < sizeof(szSourceFile)) {
-        strcpy(szSourceFile, pszSourceFile);
-        bResult = CopyFileA(szSourceFile, PerlDir_mapA(SvPV_nolen(ST(1))), !SvTRUE(ST(2)));
-        if (bResult)
-            XSRETURN_YES;
-    }
+    strcpy(szSourceFile, PerlDir_mapA(SvPV_nolen(ST(0))));
+    bResult = CopyFileA(szSourceFile, PerlDir_mapA(SvPV_nolen(ST(1))), !SvTRUE(ST(2)));
+    if (bResult)
+	XSRETURN_YES;
     XSRETURN_NO;
 }
 
@@ -1672,39 +1651,6 @@ XS(w32_CreateFile)
     XSRETURN(1);
 }
 
-XS(w32_GetSystemMetrics)
-{
-    dXSARGS;
-
-    if (items != 1)
-	Perl_croak(aTHX_ "usage: Win32::GetSystemMetrics($index)");
-
-    XSRETURN_IV(GetSystemMetrics((int)SvIV(ST(0))));
-}
-
-XS(w32_GetProductInfo)
-{
-    dXSARGS;
-    DWORD type;
-    HMODULE module;
-    PFNGetProductInfo pfnGetProductInfo;
-
-    if (items != 4)
-	Perl_croak(aTHX_ "usage: Win32::GetProductInfo($major,$minor,$spmajor,$spminor)");
-
-    module = GetModuleHandle("kernel32.dll");
-    GETPROC(GetProductInfo);
-    if (pfnGetProductInfo &&
-        pfnGetProductInfo((DWORD)SvIV(ST(0)), (DWORD)SvIV(ST(1)),
-                          (DWORD)SvIV(ST(2)), (DWORD)SvIV(ST(3)), &type))
-    {
-        XSRETURN_IV(type);
-    }
-
-    /* PRODUCT_UNDEFINED */
-    XSRETURN_IV(0);
-}
-
 MODULE = Win32            PACKAGE = Win32
 
 PROTOTYPES: DISABLE
@@ -1766,8 +1712,6 @@ BOOT:
     newXS("Win32::GetCurrentThreadId", w32_GetCurrentThreadId, file);
     newXS("Win32::CreateDirectory", w32_CreateDirectory, file);
     newXS("Win32::CreateFile", w32_CreateFile, file);
-    newXS("Win32::GetSystemMetrics", w32_GetSystemMetrics, file);
-    newXS("Win32::GetProductInfo", w32_GetProductInfo, file);
 #ifdef __CYGWIN__
     newXS("Win32::SetChildShowWindow", w32_SetChildShowWindow, file);
 #endif

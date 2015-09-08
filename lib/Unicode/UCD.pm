@@ -2,11 +2,8 @@ package Unicode::UCD;
 
 use strict;
 use warnings;
-no warnings 'surrogate';    # surrogates can be inputs to this
-use charnames ();
-use Unicode::Normalize qw(getCombinClass NFKD);
 
-our $VERSION = '0.32';
+our $VERSION = '0.27';
 
 use Storable qw(dclone);
 
@@ -21,9 +18,7 @@ our @EXPORT_OK = qw(charinfo
 		    general_categories bidi_types
 		    compexcl
 		    casefold casespec
-		    namedseq
-                    num
-                );
+		    namedseq);
 
 use Carp;
 
@@ -70,9 +65,6 @@ Unicode::UCD - Unicode character database
 
     my $unicode_version = Unicode::UCD::UnicodeVersion();
 
-    my $convert_to_numeric =
-                Unicode::UCD::num("\N{RUMI DIGIT ONE}\N{RUMI DIGIT TWO}");
-
 =head1 DESCRIPTION
 
 The Unicode::UCD module offers a series of functions that
@@ -86,12 +78,16 @@ a decimal or a hexadecimal scalar designating a Unicode code point, or C<U+>
 followed by hexadecimals designating a Unicode code point.  In other words, if
 you want a code point to be interpreted as a hexadecimal number, you must
 prefix it with either C<0x> or C<U+>, because a string like e.g. C<123> will be
-interpreted as a decimal code point.  Note that the largest code point in
-Unicode is U+10FFFF.
+interpreted as a decimal code point.  Also note that Unicode is B<not> limited
+to 16 bits (the number of Unicode code points is open-ended, in theory
+unlimited): you may have more than 4 hexdigits.
 =cut
 
+my $UNICODEFH;
 my $BLOCKSFH;
+my $SCRIPTSFH;
 my $VERSIONFH;
+my $COMPEXCLFH;
 my $CASEFOLDFH;
 my $CASESPECFH;
 my $NAMEDSEQFH;
@@ -174,17 +170,13 @@ I<code>.  Each has at least four hexdigits.
 The codes may be preceded by a word enclosed in angle brackets then a space,
 like C<E<lt>compatE<gt> >, giving the type of decomposition
 
-This decomposition may be an intermediate one whose components are also
-decomposable.  Use L<Unicode::Normalize> to get the final decomposition.
-
 =item B<decimal>
 
 if I<code> is a decimal digit this is its integer numeric value
 
 =item B<digit>
 
-if I<code> represents some other digit-like number, this is its integer
-numeric value
+if I<code> represents a whole number, this is its integer numeric value
 
 =item B<numeric>
 
@@ -202,12 +194,14 @@ existed for this code point and is different from the current name
 
 =item B<comment>
 
-As of Unicode 6.0, this is always empty.
+ISO 10646 comment field.
+It appears in parentheses in the ISO 10646 names list,
+or contains an asterisk to indicate there is
+a note for this code point in Annex P of that standard.
 
 =item B<upper>
 
-is empty if there is no single code point uppercase mapping for I<code>
-(its uppercase mapping is itself);
+is empty if there is no single code point uppercase mapping for I<code>;
 otherwise it is that mapping expressed as at least four hexdigits.
 (L</casespec()> should be used in addition to B<charinfo()>
 for case mappings when the calling program can cope with multiple code point
@@ -215,8 +209,7 @@ mappings.)
 
 =item B<lower>
 
-is empty if there is no single code point lowercase mapping for I<code>
-(its lowercase mapping is itself);
+is empty if there is no single code point lowercase mapping for I<code>;
 otherwise it is that mapping expressed as at least four hexdigits.
 (L</casespec()> should be used in addition to B<charinfo()>
 for case mappings when the calling program can cope with multiple code point
@@ -224,8 +217,7 @@ mappings.)
 
 =item B<title>
 
-is empty if there is no single code point titlecase mapping for I<code>
-(its titlecase mapping is itself);
+is empty if there is no single code point titlecase mapping for I<code>;
 otherwise it is that mapping expressed as at least four hexdigits.
 (L</casespec()> should be used in addition to B<charinfo()>
 for case mappings when the calling program can cope with multiple code point
@@ -233,7 +225,7 @@ mappings.)
 
 =item B<block>
 
-block I<code> belongs to (used in C<\p{Blk=...}>).
+block I<code> belongs to (used in \p{In...}).
 See L</Blocks versus Scripts>.
 
 
@@ -250,7 +242,7 @@ you will need also the L</compexcl()>, and L</casespec()> functions.
 
 =cut
 
-# NB: This function is nearly duplicated in charnames.pm
+# NB: This function is duplicated in charnames.pm
 sub _getcode {
     my $arg = shift;
 
@@ -263,152 +255,134 @@ sub _getcode {
     return;
 }
 
-# Populated by _num.  Converts real number back to input rational
-my %real_to_rational;
+# Lingua::KO::Hangul::Util not part of the standard distribution
+# but it will be used if available.
 
-# To store the contents of files found on disk.
-my @BIDIS;
-my @CATEGORIES;
-my @DECOMPOSITIONS;
-my @NUMERIC_TYPES;
-my @SIMPLE_LOWER;
-my @SIMPLE_TITLE;
-my @SIMPLE_UPPER;
-my @UNICODE_1_NAMES;
-
-sub _charinfo_case {
-
-    # Returns the value to set into one of the case fields in the charinfo
-    # structure.
-    #   $char is the character,
-    #   $cased is the case-changed character
-    #   $file is the file in lib/unicore/To/$file that contains the data
-    #       needed for this, in the form that _search() understands.
-    #   $array_ref points to the array holding the contents of $file.  It will
-    #       be populated if empty.
-    # By using the 'uc', etc. functions, we avoid loading more files into
-    # memory except for those rare cases where the simple casing (which has
-    # been what charinfo() has always returned, is different than the full
-    # casing.
-    my ($char, $cased, $file, $array_ref) = @_;
-
-    return "" if $cased eq $char;
-
-    return sprintf("%04X", ord $cased) if length($cased) == 1;
-
-    @$array_ref =_read_table("unicore/To/$file") unless @$array_ref;
-    return _search($array_ref, 0, $#$array_ref, ord $char) // "";
+eval { require Lingua::KO::Hangul::Util };
+my $hasHangulUtil = ! $@;
+if ($hasHangulUtil) {
+    Lingua::KO::Hangul::Util->import();
 }
 
+sub hangul_decomp { # internal: called from charinfo
+    if ($hasHangulUtil) {
+	my @tmp = decomposeHangul(shift);
+	return sprintf("%04X %04X",      @tmp) if @tmp == 2;
+	return sprintf("%04X %04X %04X", @tmp) if @tmp == 3;
+    }
+    return;
+}
+
+sub hangul_charname { # internal: called from charinfo
+    return sprintf("HANGUL SYLLABLE-%04X", shift);
+}
+
+sub han_charname { # internal: called from charinfo
+    return sprintf("CJK UNIFIED IDEOGRAPH-%04X", shift);
+}
+
+# Overwritten by data in file
+my %first_last = (
+   'CJK Ideograph Extension A' => [ 0x3400,   0x4DB5   ],
+   'CJK Ideograph'             => [ 0x4E00,   0x9FA5   ],
+   'CJK Ideograph Extension B' => [ 0x20000,  0x2A6D6  ],
+);
+
+get_charinfo_ranges();
+
+sub get_charinfo_ranges {
+   my @blocks = keys %first_last;
+   
+   my $fh;
+   openunicode( \$fh, 'UnicodeData.txt' );
+   if( defined $fh ){
+      while( my $line = <$fh> ){
+         next unless $line =~ /(?:First|Last)/;
+         if( grep{ $line =~ /[^;]+;<$_\s*,\s*(?:First|Last)>/ }@blocks ){
+            my ($number,$block,$type);
+            ($number,$block) = split /;/, $line;
+            $block =~ s/<|>//g;
+            ($block,$type) = split /, /, $block;
+            my $index = $type eq 'First' ? 0 : 1;
+            $first_last{ $block }->[$index] = hex $number;
+         }
+      }
+   }
+}
+
+my @CharinfoRanges = (
+# block name
+# [ first, last, coderef to name, coderef to decompose ],
+# CJK Ideographs Extension A
+  [ @{ $first_last{'CJK Ideograph Extension A'} },        \&han_charname,   undef  ],
+# CJK Ideographs
+  [ @{ $first_last{'CJK Ideograph'} },                    \&han_charname,   undef  ],
+# Hangul Syllables
+  [ 0xAC00,   0xD7A3,   $hasHangulUtil ? \&getHangulName : \&hangul_charname,  \&hangul_decomp ],
+# Non-Private Use High Surrogates
+  [ 0xD800,   0xDB7F,   undef,   undef  ],
+# Private Use High Surrogates
+  [ 0xDB80,   0xDBFF,   undef,   undef  ],
+# Low Surrogates
+  [ 0xDC00,   0xDFFF,   undef,   undef  ],
+# The Private Use Area
+  [ 0xE000,   0xF8FF,   undef,   undef  ],
+# CJK Ideographs Extension B
+  [ @{ $first_last{'CJK Ideograph Extension B'} },        \&han_charname,   undef  ],
+# Plane 15 Private Use Area
+  [ 0xF0000,  0xFFFFD,  undef,   undef  ],
+# Plane 16 Private Use Area
+  [ 0x100000, 0x10FFFD, undef,   undef  ],
+);
+
 sub charinfo {
-
-    # This function has traditionally mimicked what is in UnicodeData.txt,
-    # warts and all.  This is a re-write that avoids UnicodeData.txt so that
-    # it can be removed to save disk space.  Instead, this assembles
-    # information gotten by other methods that get data from various other
-    # files.  It uses charnames to get the character name; and various
-    # mktables tables.
-
-    use feature 'unicode_strings';
-
     my $arg  = shift;
     my $code = _getcode($arg);
-    croak __PACKAGE__, "::charinfo: unknown code '$arg'" unless defined $code;
-
-    # Non-unicode implies undef.
-    return if $code > 0x10FFFF;
-
-    my %prop;
-    my $char = chr($code);
-
-    @CATEGORIES =_read_table("unicore/To/Gc.pl") unless @CATEGORIES;
-    $prop{'category'} = _search(\@CATEGORIES, 0, $#CATEGORIES, $code)
-                        // $utf8::SwashInfo{'ToGc'}{'missing'};
-
-    return if $prop{'category'} eq 'Cn';    # Unassigned code points are undef
-
-    $prop{'code'} = sprintf "%04X", $code;
-    $prop{'name'} = ($char =~ /\p{Cntrl}/) ? '<control>'
-                                           : (charnames::viacode($code) // "");
-
-    $prop{'combining'} = getCombinClass($code);
-
-    @BIDIS =_read_table("unicore/To/Bc.pl") unless @BIDIS;
-    $prop{'bidi'} = _search(\@BIDIS, 0, $#BIDIS, $code)
-                    // $utf8::SwashInfo{'ToBc'}{'missing'};
-
-    # For most code points, we can just read in "unicore/Decomposition.pl", as
-    # its contents are exactly what should be output.  But that file doesn't
-    # contain the data for the Hangul syllable decompositions, which can be
-    # algorithmically computed, and NFKD() does that, so we call NFKD() for
-    # those.  We can't use NFKD() for everything, as it does a complete
-    # recursive decomposition, and what this function has always done is to
-    # return what's in UnicodeData.txt which doesn't have the recursivenss
-    # specified.
-    # in the decomposition types.  No decomposition implies an empty field;
-    # otherwise, all but "Canonical" imply a compatible decomposition, and
-    # the type is prefixed to that, as it is in UnicodeData.txt
-    if ($char =~ /\p{Block=Hangul_Syllables}/) {
-        # The code points of the decomposition are output in standard Unicode
-        # hex format, separated by blanks.
-        $prop{'decomposition'} = join " ", map { sprintf("%04X", $_)}
-                                           unpack "U*", NFKD($char);
+    croak __PACKAGE__, "::charinfo: unknown code '$arg'"
+	unless defined $code;
+    my $hexk = sprintf("%06X", $code);
+    my($rcode,$rname,$rdec);
+    foreach my $range (@CharinfoRanges){
+      if ($range->[0] <= $code && $code <= $range->[1]) {
+        $rcode = $hexk;
+	$rcode =~ s/^0+//;
+	$rcode =  sprintf("%04X", hex($rcode));
+        $rname = $range->[2] ? $range->[2]->($code) : '';
+        $rdec  = $range->[3] ? $range->[3]->($code) : '';
+        $hexk  = sprintf("%06X", $range->[0]); # replace by the first
+        last;
+      }
     }
-    else {
-        @DECOMPOSITIONS = _read_table("unicore/Decomposition.pl")
-                          unless @DECOMPOSITIONS;
-        $prop{'decomposition'} = _search(\@DECOMPOSITIONS, 0, $#DECOMPOSITIONS,
-                                                                $code) // "";
+    openunicode(\$UNICODEFH, "UnicodeData.txt");
+    if (defined $UNICODEFH) {
+	use Search::Dict 1.02;
+	if (look($UNICODEFH, "$hexk;", { xfrm => sub { $_[0] =~ /^([^;]+);(.+)/; sprintf "%06X;$2", hex($1) } } ) >= 0) {
+	    my $line = <$UNICODEFH>;
+	    return unless defined $line;
+	    chomp $line;
+	    my %prop;
+	    @prop{qw(
+		     code name category
+		     combining bidi decomposition
+		     decimal digit numeric
+		     mirrored unicode10 comment
+		     upper lower title
+		    )} = split(/;/, $line, -1);
+	    $hexk =~ s/^0+//;
+	    $hexk =  sprintf("%04X", hex($hexk));
+	    if ($prop{code} eq $hexk) {
+		$prop{block}  = charblock($code);
+		$prop{script} = charscript($code);
+		if(defined $rname){
+                    $prop{code} = $rcode;
+                    $prop{name} = $rname;
+                    $prop{decomposition} = $rdec;
+                }
+		return \%prop;
+	    }
+	}
     }
-
-    # Can use num() to get the numeric values, if any.
-    if (! defined (my $value = num($char))) {
-        $prop{'decimal'} = $prop{'digit'} = $prop{'numeric'} = "";
-    }
-    else {
-        if ($char =~ /\d/) {
-            $prop{'decimal'} = $prop{'digit'} = $prop{'numeric'} = $value;
-        }
-        else {
-
-            # For non-decimal-digits, we have to read in the Numeric type
-            # to distinguish them.  It is not just a matter of integer vs.
-            # rational, as some whole number values are not considered digits,
-            # e.g., TAMIL NUMBER TEN.
-            $prop{'decimal'} = "";
-
-            @NUMERIC_TYPES =_read_table("unicore/To/Nt.pl")
-                                unless @NUMERIC_TYPES;
-            if ((_search(\@NUMERIC_TYPES, 0, $#NUMERIC_TYPES, $code) // "")
-                eq 'Digit')
-            {
-                $prop{'digit'} = $prop{'numeric'} = $value;
-            }
-            else {
-                $prop{'digit'} = "";
-                $prop{'numeric'} = $real_to_rational{$value} // $value;
-            }
-        }
-    }
-
-    $prop{'mirrored'} = ($char =~ /\p{Bidi_Mirrored}/) ? 'Y' : 'N';
-
-    @UNICODE_1_NAMES =_read_table("unicore/To/Na1.pl") unless @UNICODE_1_NAMES;
-    $prop{'unicode10'} = _search(\@UNICODE_1_NAMES, 0, $#UNICODE_1_NAMES, $code)
-                         // "";
-
-    # This is true starting in 6.0, but, num() also requires 6.0, so
-    # don't need to test for version again here.
-    $prop{'comment'} = "";
-
-    $prop{'upper'} = _charinfo_case($char, uc $char, '_suc.pl', \@SIMPLE_UPPER);
-    $prop{'lower'} = _charinfo_case($char, lc $char, '_slc.pl', \@SIMPLE_LOWER);
-    $prop{'title'} = _charinfo_case($char, ucfirst $char, '_stc.pl',
-                                                                \@SIMPLE_TITLE);
-
-    $prop{block}  = charblock($code);
-    $prop{script} = charscript($code);
-    return \%prop;
+    return;
 }
 
 sub _search { # Binary search in a [[lo,hi,prop],[...],...] table.
@@ -429,39 +403,6 @@ sub _search { # Binary search in a [[lo,hi,prop],[...],...] table.
     } else {
 	return $table->[$mid]->[2];
     }
-}
-
-sub _read_table {
-
-    # Returns the contents of the mktables generated table file located at $1
-    # in the form of an array of arrays.  Each outer array denotes a range
-    # with [0] the start point of that range; [1] the end point; and [2] the
-    # value that every code point in the range has.
-    #
-    # This has the side effect of setting
-    # $utf8::SwashInfo{$property}{'format'} to be the mktables format of the
-    #                                       table; and
-    # $utf8::SwashInfo{$property}{'missing'} to be the value for all entries
-    #                                        not listed in the table.
-    # where $property is the Unicode property name, preceded by 'To' for map
-    # properties., e.g., 'ToSc'.
-    #
-    # Table entries look like one of:
-    # 0000	0040	Common	# [65]
-    # 00AA		Latin
-
-    my $table = shift;
-    my @return;
-    local $_;
-
-    for (split /^/m, do $table) {
-        my ($start, $end, $value) = / ^ (.+?) \t (.*?) \t (.+?)
-                                        \s* ( \# .* )?  # Optional comment
-                                        $ /x;
-        $end = $start if $end eq "";
-        push @return, [ hex $start, hex $end, $value ];
-    }
-    return @return;
 }
 
 sub charinrange {
@@ -503,9 +444,6 @@ my @BLOCKS;
 my %BLOCKS;
 
 sub _charblocks {
-
-    # Can't read from the mktables table because it loses the hyphens in the
-    # original.
     unless (@BLOCKS) {
 	if (openunicode(\$BLOCKSFH, "Blocks.txt")) {
 	    local $_;
@@ -530,12 +468,13 @@ sub charblock {
     my $code = _getcode($arg);
 
     if (defined $code) {
-	my $result = _search(\@BLOCKS, 0, $#BLOCKS, $code);
-        return $result if defined $result;
-        return 'No_Block';
-    }
-    elsif (exists $BLOCKS{$arg}) {
-        return dclone $BLOCKS{$arg};
+	_search(\@BLOCKS, 0, $#BLOCKS, $code);
+    } else {
+	if (exists $BLOCKS{$arg}) {
+	    return dclone $BLOCKS{$arg};
+	} else {
+	    return;
+	}
     }
 }
 
@@ -568,10 +507,22 @@ my @SCRIPTS;
 my %SCRIPTS;
 
 sub _charscripts {
-    @SCRIPTS =_read_table("unicore/To/Sc.pl") unless @SCRIPTS;
-    foreach my $entry (@SCRIPTS) {
-        $entry->[2] =~ s/(_\w)/\L$1/g;  # Preserve old-style casing
-        push @{$SCRIPTS{$entry->[2]}}, $entry;
+    unless (@SCRIPTS) {
+	if (openunicode(\$SCRIPTSFH, "Scripts.txt")) {
+	    local $_;
+	    while (<$SCRIPTSFH>) {
+		if (/^([0-9A-F]+)(?:\.\.([0-9A-F]+))?\s+;\s+(\w+)/) {
+		    my ($lo, $hi) = (hex($1), $2 ? hex($2) : hex($1));
+		    my $script = lc($3);
+		    $script =~ s/\b(\w)/uc($1)/ge;
+		    my $subrange = [ $lo, $hi, $script ];
+		    push @SCRIPTS, $subrange;
+		    push @{$SCRIPTS{$script}}, $subrange;
+		}
+	    }
+	    close($SCRIPTSFH);
+	    @SCRIPTS = sort { $a->[0] <=> $b->[0] } @SCRIPTS;
+	}
     }
 }
 
@@ -583,14 +534,14 @@ sub charscript {
     my $code = _getcode($arg);
 
     if (defined $code) {
-	my $result = _search(\@SCRIPTS, 0, $#SCRIPTS, $code);
-        return $result if defined $result;
-        return $utf8::SwashInfo{'ToSc'}{'missing'};
-    } elsif (exists $SCRIPTS{$arg}) {
-        return dclone $SCRIPTS{$arg};
+	_search(\@SCRIPTS, 0, $#SCRIPTS, $code);
+    } else {
+	if (exists $SCRIPTS{$arg}) {
+	    return dclone $SCRIPTS{$arg};
+	} else {
+	    return;
+	}
     }
-
-    return;
 }
 
 =head2 B<charblocks()>
@@ -632,7 +583,7 @@ sub charscripts {
 
 =head2 B<charinrange()>
 
-In addition to using the C<\p{Blk=...}> and C<\P{Blk=...}> constructs, you
+In addition to using the C<\p{In...}> and C<\P{In...}> constructs, you
 can also test whether a code point is in the I<range> as returned by
 L</charblock()> and L</charscript()> or as the values of the hash returned
 by L</charblocks()> and L</charscripts()> by using charinrange():
@@ -758,34 +709,35 @@ sub bidi_types {
 
     my $compexcl = compexcl(0x09dc);
 
-This routine is included for backwards compatibility, but as of Perl 5.12, for
-most purposes it is probably more convenient to use one of the following
-instead:
-
-    my $compexcl = chr(0x09dc) =~ /\p{Comp_Ex};
-    my $compexcl = chr(0x09dc) =~ /\p{Full_Composition_Exclusion};
-
-or even
-
-    my $compexcl = chr(0x09dc) =~ /\p{CE};
-    my $compexcl = chr(0x09dc) =~ /\p{Composition_Exclusion};
-
-The first two forms return B<true> if the L</code point argument> should not
-be produced by composition normalization.  The final two forms
-additionally require that this fact not otherwise be determinable from
-the Unicode data base for them to return B<true>.
-
-This routine behaves identically to the final two forms.  That is,
-it does not return B<true> if the code point has a decomposition
+This returns B<true> if the
+L</code point argument> should not be produced by composition normalization,
+B<AND> if that fact is not otherwise determinable from the Unicode data base.
+It currently does not return B<true> if the code point has a decomposition
 consisting of another single code point, nor if its decomposition starts
 with a code point whose combining class is non-zero.  Code points that meet
 either of these conditions should also not be produced by composition
-normalization, which is probably why you should use the
-C<Full_Composition_Exclusion> property instead, as shown above.
+normalization.
 
-The routine returns B<false> otherwise.
+It returns B<false> otherwise.
 
 =cut
+
+my %COMPEXCL;
+
+sub _compexcl {
+    unless (%COMPEXCL) {
+	if (openunicode(\$COMPEXCLFH, "CompositionExclusions.txt")) {
+	    local $_;
+	    while (<$COMPEXCLFH>) {
+		if (/^([0-9A-F]+)\s+\#\s+/) {
+		    my $code = hex($1);
+		    $COMPEXCL{$code} = undef;
+		}
+	    }
+	    close($COMPEXCLFH);
+	}
+    }
+}
 
 sub compexcl {
     my $arg  = shift;
@@ -793,8 +745,9 @@ sub compexcl {
     croak __PACKAGE__, "::compexcl: unknown code '$arg'"
 	unless defined $code;
 
-    no warnings "non_unicode";     # So works on non-Unicode code points
-    return chr($code) =~ /\p{Composition_Exclusion}/;
+    _compexcl() unless %COMPEXCL;
+
+    return exists $COMPEXCL{$code};
 }
 
 =head2 B<casefold()>
@@ -1025,7 +978,7 @@ one or more codes (separated by spaces) that taken in order give the
 code points for the title case of I<code>.
 Each has at least four hexdigits.
 
-=item B<upper>
+=item B<lower>
 
 one or more codes (separated by spaces) that taken in order give the
 code points for the upper case of I<code>.
@@ -1066,7 +1019,7 @@ will be its locale name, defined as a 2-letter ISO 3166 country code, possibly
 followed by a "_" and a 2-letter ISO language code (possibly followed by a "_"
 and a variant code).  You can find the lists of all possible locales, see
 L<Locale::Country> and L<Locale::Language>.
-(In Unicode 6.0, the only locales returned by this function
+(In Unicode 5.1, the only locales returned by this function
 are C<lt>, C<tr>, and C<az>.)
 
 Each locale key is a reference to a hash that has the form above, and gives
@@ -1170,26 +1123,19 @@ on the context.
 This function only operates on officially approved (not provisional) named
 sequences.
 
-Note that as of Perl 5.14, C<\N{KATAKANA LETTER AINU P}> will insert the named
-sequence into double-quoted strings, and C<charnames::string_vianame("KATAKANA
-LETTER AINU P")> will return the same string this function does, but will also
-operate on character names that aren't named sequences, without you having to
-know which are which.  See L<charnames>.
-
 =cut
 
 my %NAMEDSEQ;
 
 sub _namedseq {
     unless (%NAMEDSEQ) {
-	if (openunicode(\$NAMEDSEQFH, "Name.pl")) {
+	if (openunicode(\$NAMEDSEQFH, "NamedSequences.txt")) {
 	    local $_;
 	    while (<$NAMEDSEQFH>) {
-		if (/^ [0-9A-F]+ \  /x) {
-                    chomp;
-                    my ($sequence, $name) = split /\t/;
-		    my @s = map { chr(hex($_)) } split(' ', $sequence);
-		    $NAMEDSEQ{$name} = join("", @s);
+		if (/^(.+)\s*;\s*([0-9A-F]+(?: [0-9A-F]+)*)$/) {
+		    my ($n, $s) = ($1, $2);
+		    my @s = map { chr(hex($_)) } split(' ', $s);
+		    $NAMEDSEQ{$n} = join("", @s);
 		}
 	    }
 	    close($NAMEDSEQFH);
@@ -1198,158 +1144,22 @@ sub _namedseq {
 }
 
 sub namedseq {
-
-    # Use charnames::string_vianame() which now returns this information,
-    # unless the caller wants the hash returned, in which case we read it in,
-    # and thereafter use it instead of calling charnames, as it is faster.
-
+    _namedseq() unless %NAMEDSEQ;
     my $wantarray = wantarray();
     if (defined $wantarray) {
 	if ($wantarray) {
 	    if (@_ == 0) {
-                _namedseq() unless %NAMEDSEQ;
 		return %NAMEDSEQ;
 	    } elsif (@_ == 1) {
-		my $s;
-                if (%NAMEDSEQ) {
-                    $s = $NAMEDSEQ{ $_[0] };
-                }
-                else {
-                    $s = charnames::string_vianame($_[0]);
-                }
+		my $s = $NAMEDSEQ{ $_[0] };
 		return defined $s ? map { ord($_) } split('', $s) : ();
 	    }
 	} elsif (@_ == 1) {
-            return $NAMEDSEQ{ $_[0] } if %NAMEDSEQ;
-            return charnames::string_vianame($_[0]);
+	    return $NAMEDSEQ{ $_[0] };
 	}
     }
     return;
 }
-
-my %NUMERIC;
-
-sub _numeric {
-
-    # Unicode 6.0 instituted the rule that only digits in a consecutive
-    # block of 10 would be considered decimal digits.  Before that, the only
-    # problematic code point that I'm (khw) aware of is U+019DA, NEW TAI LUE
-    # THAM DIGIT ONE, which is an alternate form of U+019D1, NEW TAI LUE DIGIT
-    # ONE.  The code could be modified to handle that, but not bothering, as
-    # in TUS 6.0, U+19DA was changed to Nt=Di.
-    if ((pack "C*", split /\./, UnicodeVersion()) lt 6.0.0) {
-	croak __PACKAGE__, "::num requires Unicode 6.0 or greater"
-    }
-    my @numbers = _read_table("unicore/To/Nv.pl");
-    foreach my $entry (@numbers) {
-        my ($start, $end, $value) = @$entry;
-
-        # If value contains a slash, convert to decimal, add a reverse hash
-        # used by charinfo.
-        if ((my @rational = split /\//, $value) == 2) {
-            my $real = $rational[0] / $rational[1];
-            $real_to_rational{$real} = $value;
-            $value = $real;
-        }
-
-        for my $i ($start .. $end) {
-            $NUMERIC{$i} = $value;
-        }
-    }
-
-    # Decided unsafe to use these that aren't officially part of the Unicode
-    # standard.
-    #use Math::Trig;
-    #my $pi = acos(-1.0);
-    #$NUMERIC{0x03C0} = $pi;
-
-    # Euler's constant, not to be confused with Euler's number
-    #$NUMERIC{0x2107} = 0.57721566490153286060651209008240243104215933593992;
-
-    # Euler's number
-    #$NUMERIC{0x212F} = 2.7182818284590452353602874713526624977572;
-
-    return;
-}
-
-=pod
-
-=head2 num
-
-C<num> returns the numeric value of the input Unicode string; or C<undef> if it
-doesn't think the entire string has a completely valid, safe numeric value.
-
-If the string is just one character in length, the Unicode numeric value
-is returned if it has one, or C<undef> otherwise.  Note that this need
-not be a whole number.  C<num("\N{TIBETAN DIGIT HALF ZERO}")>, for
-example returns -0.5.
-
-=cut
-
-#A few characters to which Unicode doesn't officially
-#assign a numeric value are considered numeric by C<num>.
-#These are:
-
-# EULER CONSTANT             0.5772...  (this is NOT Euler's number)
-# SCRIPT SMALL E             2.71828... (this IS Euler's number)
-# GREEK SMALL LETTER PI      3.14159...
-
-=pod
-
-If the string is more than one character, C<undef> is returned unless
-all its characters are decimal digits (that is they would match C<\d+>),
-from the same script.  For example if you have an ASCII '0' and a Bengali
-'3', mixed together, they aren't considered a valid number, and C<undef>
-is returned.  A further restriction is that the digits all have to be of
-the same form.  A half-width digit mixed with a full-width one will
-return C<undef>.  The Arabic script has two sets of digits;  C<num> will
-return C<undef> unless all the digits in the string come from the same
-set.
-
-C<num> errs on the side of safety, and there may be valid strings of
-decimal digits that it doesn't recognize.  Note that Unicode defines
-a number of "digit" characters that aren't "decimal digit" characters.
-"Decimal digits" have the property that they have a positional value, i.e.,
-there is a units position, a 10's position, a 100's, etc, AND they are
-arranged in Unicode in blocks of 10 contiguous code points.  The Chinese
-digits, for example, are not in such a contiguous block, and so Unicode
-doesn't view them as decimal digits, but merely digits, and so C<\d> will not
-match them.  A single-character string containing one of these digits will
-have its decimal value returned by C<num>, but any longer string containing
-only these digits will return C<undef>.
-
-Strings of multiple sub- and superscripts are not recognized as numbers.  You
-can use either of the compatibility decompositions in Unicode::Normalize to
-change these into digits, and then call C<num> on the result.
-
-=cut
-
-# To handle sub, superscripts, this could if called in list context,
-# consider those, and return the <decomposition> type in the second
-# array element.
-
-sub num {
-    my $string = $_[0];
-
-    _numeric unless %NUMERIC;
-
-    my $length = length($string);
-    return $NUMERIC{ord($string)} if $length == 1;
-    return if $string =~ /\D/;
-    my $first_ord = ord(substr($string, 0, 1));
-    my $value = $NUMERIC{$first_ord};
-    my $zero_ord = $first_ord - $value;
-
-    for my $i (1 .. $length -1) {
-        my $ord = ord(substr($string, $i, 1));
-        my $digit = $ord - $zero_ord;
-        return unless $digit >= 0 && $digit <= 9;
-        $value = $value * 10 + $digit;
-    }
-    return $value;
-}
-
-
 
 =head2 Unicode::UCD::UnicodeVersion
 
@@ -1394,7 +1204,7 @@ For scripts see UTR #24: L<http://www.unicode.org/unicode/reports/tr24/>
 
 Scripts are matched with the regular-expression construct
 C<\p{...}> (e.g. C<\p{Tibetan}> matches characters of the Tibetan script),
-while C<\p{Blk=...}> is used for blocks (e.g. C<\p{Blk=Tibetan}> matches
+while C<\p{In...}> is used for blocks (e.g. C<\p{InTibetan}> matches
 any of the 256 code points in the Tibetan block).
 
 
@@ -1408,6 +1218,8 @@ if you are wondering where one of your filehandles went, that's where.
 =head1 BUGS
 
 Does not yet support EBCDIC platforms.
+
+L</compexcl()> should give a complete list of excluded code points.
 
 =head1 AUTHOR
 

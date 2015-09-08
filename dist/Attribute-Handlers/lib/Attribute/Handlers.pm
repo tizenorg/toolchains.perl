@@ -4,7 +4,7 @@ use Carp;
 use warnings;
 use strict;
 use vars qw($VERSION $AUTOLOAD);
-$VERSION = '0.89'; # remember to update version in POD!
+$VERSION = '0.87'; # remember to update version in POD!
 # $DB::single=1;
 
 my %symcache;
@@ -235,27 +235,18 @@ sub _apply_handler_AH_ {
 {
         no warnings 'void';
         CHECK {
-                $global_phase++;
-                _resolve_lastattr if _delayed_name_resolution;
-                foreach my $decl (@declarations) {
-                        _apply_handler_AH_($decl, 'CHECK');
-                }
+               $global_phase++;
+               _resolve_lastattr if _delayed_name_resolution;
+               _apply_handler_AH_($_,'CHECK') foreach @declarations;
         }
 
         INIT {
                 $global_phase++;
-                foreach my $decl (@declarations) {
-                        _apply_handler_AH_($decl, 'INIT');
-                }
+                _apply_handler_AH_($_,'INIT') foreach @declarations
         }
 }
 
-END {
-        $global_phase++;
-        foreach my $decl (@declarations) {
-                _apply_handler_AH_($decl, 'END');
-        }
-}
+END { $global_phase++; _apply_handler_AH_($_,'END') foreach @declarations }
 
 1;
 __END__
@@ -266,8 +257,8 @@ Attribute::Handlers - Simpler definition of attribute handlers
 
 =head1 VERSION
 
-This document describes version 0.89 of Attribute::Handlers,
-released April 5, 2010.
+This document describes version 0.87 of Attribute::Handlers,
+released September 21, 2009.
 
 =head1 SYNOPSIS
 
@@ -858,7 +849,7 @@ C<$referent>, which is a reference to a variable or subroutine (SCALAR, ARRAY,
 HASH, or CODE). If it finds the typeglob, it returns it. Otherwise, it returns
 undef. Note that C<findsym> memoizes the typeglobs it has previously
 successfully found, so subsequent calls with the same arguments should be
-much faster.
+must faster.
 
 =back
 

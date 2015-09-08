@@ -4,11 +4,7 @@ BEGIN {
     require './test.pl';
 }
 
-plan tests => 5;
-
-%utf8::ToSpecUpper = (
-"s" => "SS",            # Make sure can handle weird ASCII translations
-);
+plan tests => 4;
 
 sub ToUpper {
     return <<END;
@@ -18,9 +14,6 @@ END
 
 is("\Ufoo\x{101}", "foo\x{101}", "no changes on 'foo'");
 is("\Ubar\x{101}", "BAr\x{101}", "changing 'ab' on 'bar' ");
-my $s = 's';
-utf8::upgrade $s;
-is(uc($s), "SS", "Verify uc('s') is 'SS' with our weird xlation, and utf8");
 
 sub ToLower {
     return <<END;

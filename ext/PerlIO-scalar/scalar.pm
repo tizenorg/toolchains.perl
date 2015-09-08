@@ -1,7 +1,7 @@
 package PerlIO::scalar;
-our $VERSION = '0.11_01';
-require XSLoader;
-XSLoader::load();
+our $VERSION = '0.07';
+use XSLoader ();
+XSLoader::load 'PerlIO::scalar';
 1;
 __END__
 

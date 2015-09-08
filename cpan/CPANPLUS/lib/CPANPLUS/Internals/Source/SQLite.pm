@@ -51,17 +51,9 @@ CPANPLUS::Internals::Source::SQLite - SQLite implementation
                         { AutoCommit => 1 }
                     );
         #$Dbh->dbh->trace(1);
-        $Dbh->query(qq{PRAGMA synchronous = OFF});
 
         return $Dbh;        
     };
-
-    sub __sqlite_disconnect {
-      return unless $Dbh;
-      $Dbh->disconnect;
-      $Dbh = undef;
-      return;
-    }
 }
 
 {   my $used_old_copy = 0;
@@ -87,7 +79,6 @@ CPANPLUS::Internals::Source::SQLite - SQLite implementation
             $used_old_copy = 0;
 
             ### chuck the file
-            $self->__sqlite_disconnect;
             1 while unlink $self->__sqlite_file;
         
             ### and create a new one
@@ -127,7 +118,7 @@ CPANPLUS::Internals::Source::SQLite - SQLite implementation
     sub _standard_trees_completed   { return $used_old_copy }
     sub _custom_trees_completed     { return }
     ### finish transaction
-    sub _finalize_trees             { $_[0]->__sqlite_dbh->commit; return 1 }
+    sub _finalize_trees             { $_[0]->__sqlite_dbh->query('COMMIT'); return 1 }
 
     ### saves current memory state, but not implemented in sqlite
     sub _save_state                 { 
@@ -164,8 +155,8 @@ CPANPLUS::Internals::Source::SQLite - SQLite implementation
         ### keep counting how many we inserted
         unless( ++$txn_count % TXN_COMMIT ) {
             #warn "Committing transaction $txn_count";
-            $dbh->commit or error( $dbh->error ); # commit previous transaction
-            $dbh->begin_work  or error( $dbh->error ); # and start a new one
+            $dbh->query('COMMIT') or error( $dbh->error ); # commit previous transaction
+            $dbh->query('BEGIN')  or error( $dbh->error ); # and start a new one
         }
         
         $dbh->query( 
@@ -210,8 +201,8 @@ CPANPLUS::Internals::Source::SQLite - SQLite implementation
         ### keep counting how many we inserted
         unless( ++$txn_count % TXN_COMMIT ) {
             #warn "Committing transaction $txn_count";
-            $dbh->commit or error( $dbh->error ); # commit previous transaction
-            $dbh->begin_work  or error( $dbh->error ); # and start a new one
+            $dbh->query('COMMIT') or error( $dbh->error ); # commit previous transaction
+            $dbh->query('BEGIN')  or error( $dbh->error ); # and start a new one
         }
         
         $dbh->query( 
@@ -273,7 +264,7 @@ sub __sqlite_create_db {
     my $self = shift;
     my $dbh  = $self->__sqlite_dbh;
     
-    ### we can ignore the result/error; not all sqlite implementations
+    ### we can ignore the result/error; not all sqlite implemantation
     ### support this    
     $dbh->query( qq[
         DROP TABLE IF EXISTS author;
@@ -328,46 +319,7 @@ sub __sqlite_create_db {
         error( $dbh->error );
         return;
     };        
-
-    $dbh->query( qq[
-        /* the module index */
-        CREATE INDEX IX_module_module ON module (
-            module
-        );
-
-        \n]
-
-    ) or do {
-        error( $dbh->error );
-        return;
-    };
-
-    $dbh->query( qq[
-        /* the version index */
-        CREATE INDEX IX_module_version ON module (
-            version
-        );
-
-        \n]
-
-    ) or do {
-        error( $dbh->error );
-        return;
-    };
-
-    $dbh->query( qq[
-        /* the module-version index */
-        CREATE INDEX IX_module_module_version ON module (
-            module, version
-        );
-
-        \n]
-
-    ) or do {
-        error( $dbh->error );
-        return;
-    };
-
+        
     return 1;    
 }
 

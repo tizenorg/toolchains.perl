@@ -14,12 +14,12 @@ our($VERSION);
 use Carp;
 use Symbol;
 
-$VERSION = "1.14";
+$VERSION = "1.13";
 
 sub new {
     my $type = shift;
     my $class = ref($type) || $type || "IO::Pipe";
-    @_ == 0 || @_ == 2 or croak "usage: $class->([READFH, WRITEFH])";
+    @_ == 0 || @_ == 2 or croak "usage: new $class [READFH, WRITEFH]";
 
     my $me = bless gensym(), $class;
 
@@ -166,7 +166,7 @@ IO::Pipe - supply object methods for pipes
 
 	use IO::Pipe;
 
-	$pipe = IO::Pipe->new();
+	$pipe = new IO::Pipe;
 
 	if($pid = fork()) { # Parent
 	    $pipe->reader();
@@ -184,7 +184,7 @@ IO::Pipe - supply object methods for pipes
 
 	or
 
-	$pipe = IO::Pipe->new();
+	$pipe = new IO::Pipe;
 
 	$pipe->reader(qw(ls -l));
 

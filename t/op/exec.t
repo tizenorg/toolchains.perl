@@ -25,7 +25,7 @@ if ($^O eq 'VMS') {
 }
 
 
-# suppress VMS whinging about bad execs.
+# supress VMS whinging about bad execs.
 use vmsish qw(hushed);
 
 $| = 1;				# flush stdout

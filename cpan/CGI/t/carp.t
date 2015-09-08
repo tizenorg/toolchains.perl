@@ -1,12 +1,12 @@
 # -*- Mode: cperl; coding: utf-8; cperl-indent-level: 2 -*-
-#!perl -w
+#!/usr/local/bin/perl -w
 
 use strict;
 
-use Test::More tests => 61;
+use Test::More tests => 59;
 use IO::Handle;
 
-use CGI::Carp;
+BEGIN { use_ok('CGI::Carp') };
 
 #-----------------------------------------------------------------------------
 # Test id
@@ -337,13 +337,8 @@ ok(!defined buffer("WIBBLE"),      '"WIBBLE" doesn\'t returns proper filehandle'
     CGI::Carp::die( My::Stringified::Object->new );
     $result{string_object} .= $_ while <STDOUT>;
 
-    undef $@;
     CGI::Carp::die();
     $result{no_args} .= $_ while <STDOUT>;
-
-    $@ = "I think I caught a virus";
-    CGI::Carp::die();
-    $result{propagated} .= $_ while <STDOUT>;
 
     untie *STDOUT;
 
@@ -356,9 +351,6 @@ ok(!defined buffer("WIBBLE"),      '"WIBBLE" doesn\'t returns proper filehandle'
     like $result{string_object} => qr/stringified/,
       'stringified object, wrapped';
     like $result{no_args} => qr/Died at/, 'no args, wrapped';
-
-    like $result{propagated} => qr/I think I caught a virus\t\.{3}propagated/, 
-        'propagating $@ if no argument';
 
 }
 
@@ -379,20 +371,3 @@ ok(!defined buffer("WIBBLE"),      '"WIBBLE" doesn\'t returns proper filehandle'
         return bless {}, shift;
     }
 }
-
-
-@result = ();
-tie *STDOUT, 'StoreStuff' or die "Can't tie STDOUT";
- {
- 	eval {
- 		$CGI::Carp::TO_BROWSER = 0;
- 		die 'Message ToBrowser = 0';
-	};
- 	$result[0] = $@;
- 	$result[1] .= $_ while (<STDOUT>);
- }
-untie *STDOUT;
-
- like $result[0] => qr/Message ToBrowser/, 'die message for ToBrowser = 0 is OK';
- ok !$result[1], 'No output for ToBrowser = 0';
-

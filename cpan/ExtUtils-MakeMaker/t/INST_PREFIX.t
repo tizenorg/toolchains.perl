@@ -50,12 +50,10 @@ my $mm = WriteMakefile(
 
 like( $stdout->read, qr{
                         Writing\ $Makefile\ for\ Big::Liar\n
-			Writing\ MYMETA.yml\n
                         Big::Liar's\ vars\n
                         INST_LIB\ =\ \S+\n
                         INST_ARCHLIB\ =\ \S+\n
                         Writing\ $Makefile\ for\ Big::Dummy\n
-			Writing\ MYMETA.yml\n
 }x );
 
 is( $mm->{PREFIX}, '$(SITEPREFIX)', 'PREFIX set based on INSTALLDIRS' );
@@ -80,12 +78,10 @@ $mm = WriteMakefile(
 );
 like( $stdout->read, qr{
                         Writing\ $Makefile\ for\ Big::Liar\n
-			Writing\ MYMETA.yml\n
                         Big::Liar's\ vars\n
                         INST_LIB\ =\ \S+\n
                         INST_ARCHLIB\ =\ \S+\n
                         Writing\ $Makefile\ for\ Big::Dummy\n
-			Writing\ MYMETA.yml\n
 }x );
 undef $stdout;
 untie *STDOUT;

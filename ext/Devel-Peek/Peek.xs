@@ -7,10 +7,11 @@ static bool
 _runops_debug(int flag)
 {
     dTHX;
-    const bool d = PL_runops == Perl_runops_debug;
+    const bool d = PL_runops == MEMBER_TO_FPTR(Perl_runops_debug);
 
     if (flag >= 0)
-	PL_runops = flag ? Perl_runops_debug : Perl_runops_standard;
+	PL_runops 
+	    = MEMBER_TO_FPTR(flag ? Perl_runops_debug : Perl_runops_standard);
     return d;
 }
 
@@ -294,25 +295,18 @@ mstats2hash(SV *sv, SV *rv, int level)
 static void
 fill_mstats(SV *sv, int level)
 {
-    PERL_UNUSED_ARG(sv);
-    PERL_UNUSED_ARG(level);
     croak("Cannot report mstats without Perl malloc");
 }
 
 static void
 mstats_fillhash(SV *sv, int level)
 {
-    PERL_UNUSED_ARG(sv);
-    PERL_UNUSED_ARG(level);
     croak("Cannot report mstats without Perl malloc");
 }
 
 static void
 mstats2hash(SV *sv, SV *rv, int level)
 {
-    PERL_UNUSED_ARG(sv);
-    PERL_UNUSED_ARG(rv);
-    PERL_UNUSED_ARG(level);
     croak("Cannot report mstats without Perl malloc");
 }
 #endif	/* defined(MYMALLOC) */ 

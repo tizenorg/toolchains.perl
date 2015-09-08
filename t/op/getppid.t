@@ -13,10 +13,16 @@ BEGIN {
 }
 
 use strict;
+use Config;
 
 BEGIN {
+    for my $syscall (qw(pipe fork waitpid getppid)) {
+	if (!$Config{"d_$syscall"}) {
+	    print "1..0 # Skip: no $syscall\n";
+	    exit;
+	}
+    }
     require './test.pl';
-    skip_all_without_config(qw(d_pipe d_fork d_waitpid d_getppid));
     plan (8);
 }
 

@@ -10,7 +10,7 @@ use File::Find;
 use vars qw(
             $VERSION
 );
-$VERSION = "5.5001";
+$VERSION = "5.5";
 
 package CPAN::CacheMgr;
 use strict;
@@ -189,8 +189,7 @@ sub _clean_cache {
 
 #-> sub CPAN::CacheMgr::new ;
 sub new {
-    my($class,$phase) = @_;
-    $phase ||= "atstart";
+    my $class = shift;
     my $time = time;
     my($debug,$t2);
     $debug = "";
@@ -200,12 +199,10 @@ sub new {
         SCAN => $CPAN::Config->{'scan_cache'} || 'atstart',
         DU => 0
     };
-    $CPAN::Frontend->mydie("Unknown scan_cache argument: $self->{SCAN}")
-        unless $self->{SCAN} =~ /never|atstart|atexit/;
     File::Path::mkpath($self->{ID});
     my $dh = DirHandle->new($self->{ID});
     bless $self, $class;
-    $self->scan_cache($phase);
+    $self->scan_cache;
     $t2 = time;
     $debug .= "timing of CacheMgr->new: ".($t2 - $time);
     $time = $t2;
@@ -215,9 +212,10 @@ sub new {
 
 #-> sub CPAN::CacheMgr::scan_cache ;
 sub scan_cache {
-    my ($self, $phase) = @_;
-    $phase = '' unless defined $phase;
-    return unless $phase eq $self->{SCAN};
+    my $self = shift;
+    return if $self->{SCAN} eq 'never';
+    $CPAN::Frontend->mydie("Unknown scan_cache argument: $self->{SCAN}")
+        unless $self->{SCAN} eq 'atstart';
     return unless $CPAN::META->{LOCK};
     $CPAN::Frontend->myprint(
                              sprintf("Scanning cache %s for sizes\n",

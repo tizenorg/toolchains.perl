@@ -30,7 +30,7 @@ my %modules = (
     'Time::HiRes'=> q| ::can_ok( 'Time::HiRes' => 'usleep'  ) |,  # 5.7.3
 );
 
-plan tests => keys(%modules) * 3 + 7;
+plan tests => keys(%modules) * 3 + 5;
 
 # Try to load the module
 use_ok( 'XSLoader' );
@@ -40,20 +40,18 @@ can_ok( 'XSLoader' => 'load' );
 can_ok( 'XSLoader' => 'bootstrap_inherit' );
 
 # Check error messages
-foreach (['Thwack', 'package Thwack; XSLoader::load(); 1'],
-	 ['Zlott', 'package Thwack; XSLoader::load("Zlott"); 1'],
-	) {
-    my ($should_load, $codestr) = @$_;
-    is(eval $codestr, undef, "eval '$codestr' should die");
+eval { XSLoader::load() };
+like( $@, '/^XSLoader::load\(\'Your::Module\', \$Your::Module::VERSION\)/',
+        "calling XSLoader::load() with no argument" );
 
-    if ($Config{usedl}) {
-	like( $@, qr/^Can't locate loadable object for module $should_load in \@INC/,
-	      "calling XSLoader::load() under a package with no XS part" );
-    }
-    else {
-	like( $@, qr/^Can't load module $should_load, dynamic loading not available in this perl./,
-	      "calling XSLoader::load() under a package with no XS part" );
-    }
+eval q{ package Thwack; XSLoader::load('Thwack'); };
+if ($Config{usedl}) {
+    like( $@, q{/^Can't locate loadable object for module Thwack in @INC/},
+        "calling XSLoader::load() under a package with no XS part" );
+}
+else {
+    like( $@, q{/^Can't load module Thwack, dynamic loading not available in this perl./},
+        "calling XSLoader::load() under a package with no XS part" );
 }
 
 # Now try to load well known XS modules

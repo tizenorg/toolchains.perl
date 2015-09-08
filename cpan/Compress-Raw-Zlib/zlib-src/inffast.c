@@ -1,5 +1,5 @@
 /* inffast.c -- fast decoding
- * Copyright (C) 1995-2008, 2010 Mark Adler
+ * Copyright (C) 1995-2004 Mark Adler
  * For conditions of distribution and use, see copyright notice in zlib.h
  */
 
@@ -64,7 +64,7 @@
       requires strm->avail_out >= 258 for each loop to avoid checking for
       output space.
  */
-void ZLIB_INTERNAL inflate_fast(
+void inflate_fast(
     z_streamp strm,
     unsigned start)
 {
@@ -79,7 +79,7 @@ void ZLIB_INTERNAL inflate_fast(
 #endif
     unsigned wsize;             /* window size or zero if not using window */
     unsigned whave;             /* valid bytes in the window */
-    unsigned wnext;             /* window write index */
+    unsigned write;             /* window write index */
     unsigned char FAR *window;  /* allocated sliding window, if wsize != 0 */
     unsigned long hold;         /* local strm->hold */
     unsigned bits;              /* local strm->bits */
@@ -106,7 +106,7 @@ void ZLIB_INTERNAL inflate_fast(
 #endif
     wsize = state->wsize;
     whave = state->whave;
-    wnext = state->wnext;
+    write = state->write;
     window = state->window;
     hold = state->hold;
     bits = state->bits;
@@ -187,34 +187,12 @@ void ZLIB_INTERNAL inflate_fast(
                 if (dist > op) {                /* see if copy from window */
                     op = dist - op;             /* distance back in window */
                     if (op > whave) {
-                        if (state->sane) {
-                            strm->msg =
-                                (char *)"invalid distance too far back";
-                            state->mode = BAD;
-                            break;
-                        }
-#ifdef INFLATE_ALLOW_INVALID_DISTANCE_TOOFAR_ARRR
-                        if (len <= op - whave) {
-                            do {
-                                PUP(out) = 0;
-                            } while (--len);
-                            continue;
-                        }
-                        len -= op - whave;
-                        do {
-                            PUP(out) = 0;
-                        } while (--op > whave);
-                        if (op == 0) {
-                            from = out - dist;
-                            do {
-                                PUP(out) = PUP(from);
-                            } while (--len);
-                            continue;
-                        }
-#endif
+                        strm->msg = (char *)"invalid distance too far back";
+                        state->mode = BAD;
+                        break;
                     }
                     from = window - OFF;
-                    if (wnext == 0) {           /* very common case */
+                    if (write == 0) {           /* very common case */
                         from += wsize - op;
                         if (op < len) {         /* some from window */
                             len -= op;
@@ -224,17 +202,17 @@ void ZLIB_INTERNAL inflate_fast(
                             from = out - dist;  /* rest from output */
                         }
                     }
-                    else if (wnext < op) {      /* wrap around window */
-                        from += wsize + wnext - op;
-                        op -= wnext;
+                    else if (write < op) {      /* wrap around window */
+                        from += wsize + write - op;
+                        op -= write;
                         if (op < len) {         /* some from end of window */
                             len -= op;
                             do {
                                 PUP(out) = PUP(from);
                             } while (--op);
                             from = window - OFF;
-                            if (wnext < len) {  /* some from start of window */
-                                op = wnext;
+                            if (write < len) {  /* some from start of window */
+                                op = write;
                                 len -= op;
                                 do {
                                     PUP(out) = PUP(from);
@@ -244,7 +222,7 @@ void ZLIB_INTERNAL inflate_fast(
                         }
                     }
                     else {                      /* contiguous in window */
-                        from += wnext - op;
+                        from += write - op;
                         if (op < len) {         /* some from window */
                             len -= op;
                             do {
@@ -327,7 +305,7 @@ void ZLIB_INTERNAL inflate_fast(
    inflate_fast() speedups that turned out slower (on a PowerPC G3 750CXe):
    - Using bit fields for code structure
    - Different op definition to avoid & for extra bits (do & for table bits)
-   - Three separate decoding do-loops for direct, window, and wnext == 0
+   - Three separate decoding do-loops for direct, window, and write == 0
    - Special case for distance > 1 copies to do overlapped load and store copy
    - Explicit branch predictions (based on measured branch probabilities)
    - Deferring match copy and interspersed it with decoding subsequent codes

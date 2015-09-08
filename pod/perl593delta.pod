@@ -1,5 +1,3 @@
-=encoding utf8
-
 =head1 NAME
 
 perl593delta - what is new for perl v5.9.3

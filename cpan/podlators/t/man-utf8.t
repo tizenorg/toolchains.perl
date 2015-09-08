@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 #
-# man-utf8.t -- Test Pod::Man with UTF-8 input.
+# man-options.t -- Additional tests for Pod::Man options.
 #
 # Copyright 2002, 2004, 2006, 2008, 2009 Russ Allbery <rra@stanford.edu>
 #

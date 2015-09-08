@@ -20,7 +20,7 @@ BEGIN {
 
 my $test_count = 85;
 $test_count += 119 if $symlink_exists;
-$test_count += 26 if $^O eq 'MSWin32';
+$test_count += 18 if $^O eq 'MSWin32';
 $test_count += 2 if $^O eq 'MSWin32' and $symlink_exists;
 
 print "1..$test_count\n";
@@ -166,8 +166,10 @@ sub wanted_Name {
     print "# \$File::Find::name => '$n'\n";
     my $i = rindex($n,'/');
     my $OK = exists($Expect_Name{$n});
-    if ( $OK ) {
-	$OK= exists($Expect_Name{substr($n,0,$i)})  if $i >= 0;    
+    unless ($^O eq 'MacOS') {
+        if ( $OK ) {
+            $OK= exists($Expect_Name{substr($n,0,$i)})  if $i >= 0;    
+        }
     }
     Check($OK);
     delete $Expect_Name{$n};
@@ -178,8 +180,10 @@ sub wanted_File {
     s#\.$## if ($^O eq 'VMS' && $_ ne '.');
     my $i = rindex($_,'/');
     my $OK = exists($Expect_File{ $_});
-    if ( $OK ) {
-	$OK= exists($Expect_File{ substr($_,0,$i)})  if $i >= 0;
+    unless ($^O eq 'MacOS') {
+        if ( $OK ) {
+            $OK= exists($Expect_File{ substr($_,0,$i)})  if $i >= 0;
+        }
     }
     Check($OK);
     delete $Expect_File{ $_};
@@ -224,18 +228,29 @@ sub my_postprocess {
 # there are limitations. Don't try to create an absolute path,
 # because that may fail on operating systems that have the concept of
 # volume names (e.g. Mac OS). As a special case, you can pass it a "." 
-# as first argument, to create a directory path like "./fa/dir". If there's
-# no second argument, this function will return "./"
+# as first argument, to create a directory path like "./fa/dir" on
+# operating systems other than Mac OS (actually, Mac OS will ignore
+# the ".", if it's the first argument). If there's no second argument,
+# this function will return the empty string on Mac OS and the string
+# "./" otherwise.
 
 sub dir_path {
     my $first_arg = shift @_;
 
     if ($first_arg eq '.') {
-	return './' unless @_;
-	my $path = File::Spec->catdir(@_);
-	# add leading "./"
-	$path = "./$path";
-	return $path;
+        if ($^O eq 'MacOS') {
+            return '' unless @_;
+            # ignore first argument; return a relative path
+            # with leading ":" and with trailing ":"
+            return File::Spec->catdir(@_); 
+        } else { # other OS
+            return './' unless @_;
+            my $path = File::Spec->catdir(@_);
+            # add leading "./"
+            $path = "./$path";
+            return $path;
+        }
+
     } else { # $first_arg ne '.'
         return $first_arg unless @_; # return plain filename
         return File::Spec->catdir($first_arg, @_); # relative path
@@ -244,9 +259,14 @@ sub dir_path {
 
 
 # Use topdir() to specify a directory path that you want to pass to
-# find/finddepth. Historically topdir() differed on Mac OS classic.
+# find/finddepth. Basically, topdir() does the same as dir_path() (see
+# above), except that there's no trailing ":" on Mac OS.
 
-*topdir = \&dir_path;
+sub topdir {
+    my $path = dir_path(@_);
+    $path =~ s/:$// if ($^O eq 'MacOS');
+    return $path;
+}
 
 
 # Use file_path() to specify a file path that's expected for $_
@@ -257,18 +277,28 @@ sub dir_path {
 # file). It's independent from the platform it's run on, although
 # there are limitations. As a special case, you can pass it a "." as 
 # first argument, to create a file path like "./fa/file" on operating 
-# systems. If there's no second argument, this function will return the
-# string "./" 
+# systems other than Mac OS (actually, Mac OS will ignore the ".", if 
+# it's the first argument). If there's no second argument, this 
+# function will return the empty string on Mac OS and the string "./" 
+# otherwise.
 
 sub file_path {
     my $first_arg = shift @_;
 
     if ($first_arg eq '.') {
-	return './' unless @_;
-	my $path = File::Spec->catfile(@_);
-	# add leading "./" 
-	$path = "./$path"; 
-	return $path;
+        if ($^O eq 'MacOS') {
+            return '' unless @_;
+            # ignore first argument; return a relative path  
+            # with leading ":", but without trailing ":"
+            return File::Spec->catfile(@_); 
+        } else { # other OS
+            return './' unless @_;
+            my $path = File::Spec->catfile(@_);
+            # add leading "./" 
+            $path = "./$path"; 
+            return $path;
+        }
+
     } else { # $first_arg ne '.'
         return $first_arg unless @_; # return plain filename
         return File::Spec->catfile($first_arg, @_); # relative path
@@ -282,9 +312,15 @@ sub file_path {
 # case, also use this function to specify a file path that's expected
 # for $_.
 #
-# Historically file_path_name differed on Mac OS classic.
+# Basically, file_path_name() does the same as file_path() (see
+# above), except that there's always a leading ":" on Mac OS, even for
+# plain file/directory names.
 
-*file_path_name = \&file_path;
+sub file_path_name {
+    my $path = file_path(@_);
+    $path = ":$path" if (($^O eq 'MacOS') && ($path !~ /:/));
+    return $path;
+}
 
 
 
@@ -295,7 +331,11 @@ MkDir( dir_path('fb'), 0770  );
 touch( file_path('fb', 'fb_ord') );
 MkDir( dir_path('fb', 'fba'), 0770  );
 touch( file_path('fb', 'fba', 'fba_ord') );
-CheckDie( symlink('../fb','fa/fsl') ) if $symlink_exists;
+if ($^O eq 'MacOS') {
+      CheckDie( symlink(':fb',':fa:fsl') ) if $symlink_exists;
+} else {
+      CheckDie( symlink('../fb','fa/fsl') ) if $symlink_exists;
+}
 touch( file_path('fa', 'fa_ord') );
 
 MkDir( dir_path('fa', 'faa'), 0770  );
@@ -630,7 +670,11 @@ if ( $symlink_exists ) {
 		       file_path('dangling_dir_sl') ) );
     rmdir dir_path('dangling_dir');
     touch(file_path('dangling_file'));  
-    CheckDie( symlink('../dangling_file','fa/dangling_file_sl') );
+    if ($^O eq 'MacOS') {
+        CheckDie( symlink('dangling_file', ':fa:dangling_file_sl') );
+    } else {
+        CheckDie( symlink('../dangling_file','fa/dangling_file_sl') );
+    }      
     unlink file_path('dangling_file');
 
     { 
@@ -670,7 +714,11 @@ if ( $symlink_exists ) {
 
 
     print "# check recursion\n";
-    CheckDie( symlink('../faa','fa/faa/faa_sl') );
+    if ($^O eq 'MacOS') {
+        CheckDie( symlink(':fa:faa',':fa:faa:faa_sl') );
+    } else {
+        CheckDie( symlink('../faa','fa/faa/faa_sl') );
+    }
     undef $@;
     eval {File::Find::find( {wanted => \&simple_wanted, follow => 1,
                              no_chdir => 1}, topdir('fa') ); };
@@ -679,7 +727,11 @@ if ( $symlink_exists ) {
 
 
     print "# check follow_skip (file)\n";
-    CheckDie( symlink('./fa_ord','fa/fa_ord_sl') ); # symlink to a file
+    if ($^O eq 'MacOS') {
+        CheckDie( symlink(':fa:fa_ord',':fa:fa_ord_sl') ); # symlink to a file
+    } else {
+        CheckDie( symlink('./fa_ord','fa/fa_ord_sl') ); # symlink to a file
+    }
     undef $@;
 
     eval {File::Find::finddepth( {wanted => \&simple_wanted,
@@ -725,7 +777,11 @@ if ( $symlink_exists ) {
 
 
     print "# check follow_skip (directory)\n";
-    CheckDie( symlink('./faa','fa/faa_sl') ); # symlink to a directory
+    if ($^O eq 'MacOS') {
+        CheckDie( symlink(':fa:faa',':fa:faa_sl') ); # symlink to a directory
+    } else {
+        CheckDie( symlink('./faa','fa/faa_sl') ); # symlink to a directory
+    }
     undef $@;
 
     eval {File::Find::find( {wanted => \&simple_wanted, follow => 1,
@@ -848,7 +904,12 @@ if ($symlink_exists) {  # Issue 68260
     MkDir (dir_path ('fa', 'fac'), 0770);
     MkDir (dir_path ('fb', 'fbc'), 0770);
     touch (file_path ('fa', 'fac', 'faca'));
-    CheckDie (symlink ('..////../fa/fac/faca', 'fb/fbc/fbca'));
+    if ($^O eq 'MacOS') {
+        CheckDie (symlink ('..::::..:fa:fac:faca', 'fb:fbc:fbca'));
+    }
+    else {
+        CheckDie (symlink ('..////../fa/fac/faca', 'fb/fbc/fbca'));
+    }
 
     use warnings;
     my $dangling_symlink;
@@ -868,65 +929,4 @@ if ($symlink_exists) {  # Issue 68260
     );
 
     Check (!$dangling_symlink);
-}
-
-
-if ($^O eq 'MSWin32') {
-    # Check F:F:f correctly handles a root directory path.
-    # Rather than processing the entire drive (!), simply test that the
-    # first file passed to the wanted routine is correct and then bail out.
-    $orig_dir =~ /^(\w:)/ or die "expected a drive: $orig_dir";
-    my $drive = $1;
-
-    # Determine the file in the root directory which would be
-    # first if processed in sorted order. Create one if necessary.
-    my $expected_first_file;
-    opendir(ROOT_DIR, "/") or die "cannot opendir /: $!\n";
-    foreach my $f (sort readdir ROOT_DIR) {
-        if (-f "/$f") {
-            $expected_first_file = $f;
-            last;
-        }
-    }
-    closedir ROOT_DIR;
-    my $created_file;
-    unless (defined $expected_first_file) {
-        $expected_first_file = '__perl_File_Find_test.tmp';
-        open(F, ">", "/$expected_first_file") && close(F)
-            or die "cannot create file in root directory: $!\n";
-        $created_file = 1;
-    }
-
-    # Run F:F:f with/without no_chdir for each possible style of root path.
-    # NB. If HOME were "/", then an inadvertent chdir('') would fluke the
-    # expected result, so ensure it is something else:
-    local $ENV{HOME} = $orig_dir;
-    foreach my $no_chdir (0, 1) {
-        foreach my $root_dir ("/", "\\", "$drive/", "$drive\\") {
-            eval {
-                File::Find::find({
-                    'no_chdir' => $no_chdir,
-                    'preprocess' => sub { return sort @_ },
-                    'wanted' => sub {
-                        -f or return; # the first call is for $root_dir itself.
-                        my $got = $File::Find::name;
-                        my $exp = "$root_dir$expected_first_file";
-                        print "# no_chdir=$no_chdir $root_dir '$got'\n";
-                        Check($got eq $exp);
-                        die "done"; # don't process the entire drive!
-                    },
-                }, $root_dir);
-            };
-            # If F:F:f did not die "done" then it did not Check() either.
-            unless ($@ and $@ =~ /done/) {
-                print "# no_chdir=$no_chdir $root_dir ",
-                    ($@ ? "error: $@" : "no files found"), "\n";
-                Check(0);
-            }
-        }
-    }
-    if ($created_file) {
-        unlink("/$expected_first_file")
-            or warn "can't unlink /$expected_first_file: $!\n";
-    }
 }

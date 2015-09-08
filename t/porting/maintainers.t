@@ -1,6 +1,6 @@
 #!./perl -w
 
-# Test that there are no missing Maintainers in Maintainers.pl
+# Test that there are no missing Maintainers in Maintainers.PL 
 
 BEGIN {
 	# This test script uses a slightly atypical invocation of the 'standard'

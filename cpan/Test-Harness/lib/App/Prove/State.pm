@@ -26,11 +26,11 @@ App::Prove::State - State storage for the C<prove> command.
 
 =head1 VERSION
 
-Version 3.23
+Version 3.17
 
 =cut
 
-$VERSION = '3.23';
+$VERSION = '3.17';
 
 =head1 DESCRIPTION
 
@@ -59,9 +59,9 @@ Accepts a hashref with the following key/value pairs:
 
 The filename of the data store holding the data that App::Prove::State reads.
 
-=item * C<extensions> (optional)
+=item * C<extension> (optional)
 
-The test name extensions.  Defaults to C<.t>.
+The test name extension.  Defaults to C<.t>.
 
 =item * C<result_class> (optional)
 
@@ -77,11 +77,12 @@ sub new {
     my %args = %{ shift || {} };
 
     my $self = bless {
-        select       => [],
-        seq          => 1,
-        store        => delete $args{store},
-        extensions   => ( delete $args{extensions} || ['.t'] ),
-        result_class => ( delete $args{result_class} || 'App::Prove::State::Result' ),
+        select    => [],
+        seq       => 1,
+        store     => delete $args{store},
+        extension => ( delete $args{extension} || '.t' ),
+        result_class =>
+          ( delete $args{result_class} || 'App::Prove::State::Result' ),
     }, $class;
 
     $self->{_} = $self->result_class->new(
@@ -104,17 +105,17 @@ identical interface.
 
 =cut
 
-=head2 C<extensions>
+=head2 C<extension>
 
-Get or set the list of extensions that files must have in order to be
-considered tests. Defaults to ['.t'].
+Get or set the extension files must have in order to be considered
+tests. Defaults to '.t'.
 
 =cut
 
-sub extensions {
+sub extension {
     my $self = shift;
-    $self->{extensions} = shift if @_;
-    return $self->{extensions};
+    $self->{extension} = shift if @_;
+    return $self->{extension};
 }
 
 =head2 C<results>
@@ -355,7 +356,7 @@ sub _get_raw_tests {
 
     # Do globbing on Win32.
     @argv = map { glob "$_" } @argv if NEED_GLOB;
-    my $extensions = $self->{extensions};
+    my $extension = $self->{extension};
 
     for my $arg (@argv) {
         if ( '-' eq $arg ) {
@@ -367,25 +368,23 @@ sub _get_raw_tests {
         push @tests,
             sort -d $arg
           ? $recurse
-              ? $self->_expand_dir_recursive( $arg, $extensions )
-              : map { glob( File::Spec->catfile( $arg, "*$_" ) ) } @{$extensions}
+              ? $self->_expand_dir_recursive( $arg, $extension )
+              : glob( File::Spec->catfile( $arg, "*$extension" ) )
           : $arg;
     }
     return @tests;
 }
 
 sub _expand_dir_recursive {
-    my ( $self, $dir, $extensions ) = @_;
+    my ( $self, $dir, $extension ) = @_;
 
     my @tests;
-    my $ext_string = join( '|', map { quotemeta } @{$extensions} );
-
     find(
         {   follow      => 1,      #21938
             follow_skip => 2,
             wanted      => sub {
-                -f
-                  && /(?:$ext_string)$/
+                -f 
+                  && /\Q$extension\E$/
                   && push @tests => $File::Find::name;
               }
         },

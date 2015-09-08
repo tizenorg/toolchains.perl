@@ -11,11 +11,6 @@ use_ok( 'Term::UI' );
 $Term::UI::AUTOREPLY    = $Term::UI::AUTOREPLY  = 1;
 $Term::UI::VERBOSE      = $Term::UI::VERBOSE    = 0;
 
-# SKIP tests if we aren't on a terminal
-SKIP: {
-
-skip 'not on a terminal', 18 unless -t;
-
 ### enable warnings
 $^W = 1;
 
@@ -147,5 +142,3 @@ my $tmpl = {
         is( $rest, $munged,     "   Command parsed correctly" );
     }
 }
-
-} # End SKIP block

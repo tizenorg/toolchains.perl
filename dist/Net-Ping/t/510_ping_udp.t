@@ -1,7 +1,5 @@
 # Test to perform udp protocol testing.
 
-use strict;
-
 sub isWindowsVista {
    return unless $^O eq 'MSWin32' or $^O eq "cygwin";
    return unless eval { require Win32 };
@@ -25,8 +23,12 @@ BEGIN {
   }
 }
 
-use Test::More tests => 2;
-BEGIN {use_ok('Net::Ping')};
+use Test;
+use Net::Ping;
+plan tests => 2;
+
+# Everything loaded fine
+ok 1;
 
 my $p = new Net::Ping "udp";
-is($p->ping("127.0.0.1"), 1);
+ok $p->ping("127.0.0.1");

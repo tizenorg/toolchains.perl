@@ -1,34 +1,23 @@
 package B::Debug;
 
-our $VERSION = '1.16';
+our $VERSION = '1.12';
 
 use strict;
 require 5.006;
 use B qw(peekop class walkoptree walkoptree_exec
-         main_start main_root cstring sv_undef SVf_NOK SVf_IOK);
+         main_start main_root cstring sv_undef);
 use Config;
 my (@optype, @specialsv_name);
 require B;
 if ($] < 5.009) {
   require B::Asmdata;
-  B::Asmdata->import (qw(@optype @specialsv_name));
+  B::Asmdata->import qw(@optype @specialsv_name);
 } else {
-  B->import (qw(@optype @specialsv_name));
+  B->import qw(@optype @specialsv_name);
 }
-
-if ($] < 5.006002) {
-  eval q|sub B::GV::SAFENAME {
-    my $name = (shift())->NAME;
-    # The regex below corresponds to the isCONTROLVAR macro from toke.c
-    $name =~ s/^([\cA-\cZ\c\\c[\c]\c?\c_\c^])/"^".chr(64 ^ ord($1))/e;
-    return $name;
-  }|;
-}
-
-my ($have_B_Flags, $have_B_Flags_extra);
+my $have_B_Flags;
 if (!$ENV{PERL_CORE}){ # avoid CORE test crashes
   eval { require B::Flags and $have_B_Flags++ };
-  $have_B_Flags_extra++ if $have_B_Flags and $B::Flags::VERSION gt '0.03';
 }
 my %done_gv;
 
@@ -36,18 +25,18 @@ sub _printop {
   my $op = shift;
   my $addr = ${$op} ? $op->ppaddr : '';
   $addr =~ s/^PL_ppaddr// if $addr;
-  return sprintf "0x%08x %6s %s", ${$op}, ${$op} ? class($op) : '', $addr;
+  return sprintf "0x%x %s %s", ${$op}, ${$op} ? class($op) : '', $addr;
 }
 
 sub B::OP::debug {
     my ($op) = @_;
-    printf <<'EOT', class($op), $$op, _printop($op), _printop($op->next), _printop($op->sibling), $op->targ, $op->type, $op->name;
+    printf <<'EOT', class($op), $$op, $op->ppaddr, _printop($op->next), _printop($op->sibling), $op->targ, $op->type;
 %s (0x%lx)
 	op_ppaddr	%s
 	op_next		%s
 	op_sibling	%s
 	op_targ		%d
-	op_type		%d	%s
+	op_type		%d
 EOT
     if ($] > 5.009) {
 	printf <<'EOT', $op->opt;
@@ -128,8 +117,8 @@ sub B::PMOP::debug {
 sub B::COP::debug {
     my ($op) = @_;
     $op->B::OP::debug();
-    my $warnings = ref $op->warnings ? ${$op->warnings} : 0;
-    printf <<'EOT', $op->label, $op->stashpv, $op->file, $op->cop_seq, $op->arybase, $op->line, $warnings;
+    my $cop_io = class($op->io) eq 'SPECIAL' ? '' : $op->io->as_string;
+    printf <<'EOT', $op->label, $op->stashpv, $op->file, $op->cop_seq, $op->arybase, $op->line, ${$op->warnings}, cstring($cop_io);
 	cop_label	"%s"
 	cop_stashpv	"%s"
 	cop_file	"%s"
@@ -137,11 +126,8 @@ sub B::COP::debug {
 	cop_arybase	%d
 	cop_line	%d
 	cop_warnings	0x%x
+	cop_io		%s
 EOT
-  if ($] > 5.008 and $] < 5.011) {
-    my $cop_io = class($op->io) eq 'SPECIAL' ? '' : $op->io->as_string;
-    printf("	cop_io		%s\n", cstring($cop_io));
-  }
 }
 
 sub B::SVOP::debug {
@@ -178,16 +164,11 @@ sub B::SV::debug {
 	print class($sv), " = NULL\n";
 	return;
     }
-    printf <<'EOT', class($sv), $$sv, $sv->REFCNT;
+    printf <<'EOT', class($sv), $$sv, $sv->REFCNT, $sv->FLAGS;
 %s (0x%x)
 	REFCNT		%d
 	FLAGS		0x%x
 EOT
-    printf "\tFLAGS\t\t0x%x", $sv->FLAGS;
-    if ($have_B_Flags) {
-      printf "\t%s", $have_B_Flags_extra ? $sv->flagspv(0) : $sv->flagspv;
-    }
-    print "\n";
 }
 
 sub B::RV::debug {
@@ -212,25 +193,25 @@ EOT
 sub B::IV::debug {
     my ($sv) = @_;
     $sv->B::SV::debug();
-    printf "\txiv_iv\t\t%d\n", $sv->IV if $sv->FLAGS & SVf_IOK;
+    printf "\txiv_iv\t\t%d\n", $sv->IV;
 }
 
 sub B::NV::debug {
     my ($sv) = @_;
     $sv->B::IV::debug();
-    printf "\txnv_nv\t\t%s\n", $sv->NV if $sv->FLAGS & SVf_NOK;
+    printf "\txnv_nv\t\t%s\n", $sv->NV;
 }
 
 sub B::PVIV::debug {
     my ($sv) = @_;
     $sv->B::PV::debug();
-    printf "\txiv_iv\t\t%d\n", $sv->IV if $sv->FLAGS & SVf_IOK;
+    printf "\txiv_iv\t\t%d\n", $sv->IV;
 }
 
 sub B::PVNV::debug {
     my ($sv) = @_;
     $sv->B::PVIV::debug();
-    printf "\txnv_nv\t\t%s\n", $sv->NV if $sv->FLAGS & SVf_NOK;
+    printf "\txnv_nv\t\t%s\n", $sv->NV;
 }
 
 sub B::PVLV::debug {
@@ -254,11 +235,11 @@ sub B::CV::debug {
     $sv->B::PVNV::debug();
     my ($stash) = $sv->STASH;
     my ($start) = $sv->START;
-    my ($root)  = $sv->ROOT;
+    my ($root) = $sv->ROOT;
     my ($padlist) = $sv->PADLIST;
     my ($file) = $sv->FILE;
     my ($gv) = $sv->GV;
-    printf <<'EOT', $$stash, $$start, $$root, $$gv, $file, $sv->DEPTH, $padlist, ${$sv->OUTSIDE};
+    printf <<'EOT', $$stash, $$start, $$root, $$gv, $file, $sv->DEPTH, $padlist, ${$sv->OUTSIDE}, $sv->OUTSIDE_SEQ;
 	STASH		0x%x
 	START		0x%x
 	ROOT		0x%x
@@ -267,15 +248,8 @@ sub B::CV::debug {
 	DEPTH		%d
 	PADLIST		0x%x
 	OUTSIDE		0x%x
+	OUTSIDE_SEQ	%d
 EOT
-    printf("\tOUTSIDE_SEQ\t%d\n", , $sv->OUTSIDE_SEQ) if $] > 5.007;
-    if ($have_B_Flags) {
-      my $SVt_PVCV = $] < 5.010 ? 12 : 13;
-      printf("\tCvFLAGS\t0x%x\t%s\n", $sv->CvFLAGS,
-	     $have_B_Flags_extra ? $sv->flagspv($SVt_PVCV) : $sv->flagspv);
-    } else {
-      printf("\tCvFLAGS\t0x%x\n", $sv->CvFLAGS);
-    }
     $start->debug if $start;
     $root->debug if $root;
     $gv->debug if $gv;
@@ -301,14 +275,9 @@ EOT
 	MAX		%d
 EOT
     }
-    if ($] < 5.009) {
-      if ($have_B_Flags) {
-	printf("\tAvFLAGS\t0x%x\t%s\n", $av->AvFLAGS,
-	       $have_B_Flags_extra ? $av->flagspv(10) : $av->flagspv);
-      } else {
-	printf("\tAvFLAGS\t0x%x\n", $av->AvFLAGS);
-      }
-    }
+    printf <<'EOT', $av->AvFLAGS if $] < 5.009;
+	AvFLAGS		%d
+EOT
 }
 
 sub B::GV::debug {
@@ -317,9 +286,9 @@ sub B::GV::debug {
 	printf "GV %s::%s\n", $gv->STASH->NAME, $gv->SAFENAME;
 	return;
     }
-    my $sv = $gv->SV;
-    my $av = $gv->AV;
-    my $cv = $gv->CV;
+    my ($sv) = $gv->SV;
+    my ($av) = $gv->AV;
+    my ($cv) = $gv->CV;
     $gv->B::SV::debug;
     printf <<'EOT', $gv->SAFENAME, $gv->STASH->NAME, $gv->STASH, $$sv, $gv->GvREFCNT, $gv->FORM, $$av, ${$gv->HV}, ${$gv->EGV}, $$cv, $gv->CVGEN, $gv->LINE, $gv->FILE, $gv->GvFLAGS;
 	NAME		%s
@@ -334,14 +303,8 @@ sub B::GV::debug {
 	CVGEN		%d
 	LINE		%d
 	FILE		%s
+	GvFLAGS		0x%x
 EOT
-    if ($have_B_Flags) {
-      my $SVt_PVGV = $] < 5.010 ? 13 : 9;
-      printf("\tGvFLAGS\t0x%x\t%s\n", $gv->GvFLAGS,
-	     $have_B_Flags_extra ? $gv->flagspv($SVt_PVGV) : $gv->flagspv);
-    } else {
-      printf("\tGvFLAGS\t0x%x\n", $gv->GvFLAGS);
-    }
     $sv->debug if $sv;
     $av->debug if $av;
     $cv->debug if $cv;
@@ -349,8 +312,7 @@ EOT
 
 sub B::SPECIAL::debug {
     my $sv = shift;
-    my $i = ref $sv ? $$sv : 0;
-    print exists $specialsv_name[$i] ? $specialsv_name[$i] : "", "\n";
+    print $specialsv_name[$$sv], "\n";
 }
 
 sub compile {
@@ -373,8 +335,7 @@ B::Debug - Walk Perl syntax tree, printing debug info about ops
 
 =head1 SYNOPSIS
 
-        perl -MO=Debug foo.pl
-        perl -MO=Debug,-exec foo.pl
+	perl -MO=Debug[,OPTIONS] foo.pl
 
 =head1 DESCRIPTION
 
@@ -385,6 +346,50 @@ See F<ext/B/README> and the newer L<B::Concise>, L<B::Terse>.
 With option -exec, walks tree in execute order,
 otherwise in basic order.
 
+=head1 Changes
+
+  1.12 2010-02-10 rurban
+	remove archlib installation cruft, and use the proper PM rule.
+	By Todd Rinaldo (toddr)
+
+  1.11 2008-07-14 rurban
+	avoid B::Flags in CORE tests not to crash on old XS in @INC
+
+  1.10 2008-06-28 rurban
+	require 5.006; Test::More not possible in 5.00505
+	our => my
+	
+  1.09 2008-06-18 rurban
+	minor META.yml syntax fix
+	5.8.0 ending nextstate test failure: be more tolerant
+	PREREQ_PM Test::More
+
+  1.08 2008-06-17 rurban
+	support 5.00558 - 5.6.2
+
+  1.07 2008-06-16 rurban
+	debug.t: fix strawberry perl quoting issue
+
+  1.06 2008-06-11 rurban
+	added B::Flags output
+	dual-life CPAN as B-Debug-1.06 and CORE
+	protect scalar(@array) if tied arrays leave out FETCHSIZE
+
+  1.05_03 2008-04-16 rurban
+	ithread fixes in B::AV
+	B-C-1.04_??
+
+  B-C-1.04_09 2008-02-24 rurban
+	support 5.8 (import Asmdata)
+
+  1.05_02 2008-02-21 rurban
+	added _printop
+	B-C-1.04_08 and CORE
+
+  1.05_01 2008-02-05 rurban
+	5.10 fix for op->seq
+	B-C-1.04_04
+
 =head1 AUTHOR
 
 Malcolm Beattie, C<mbeattie@sable.ox.ac.uk>
@@ -393,7 +398,7 @@ Reini Urban C<rurban@cpan.org>
 =head1 LICENSE
 
 Copyright (c) 1996, 1997 Malcolm Beattie
-Copyright (c) 2008, 2010 Reini Urban
+Copyright (c) 2008 Reini Urban
 
 	This program is free software; you can redistribute it and/or modify
 	it under the terms of either:

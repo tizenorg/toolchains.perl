@@ -5,12 +5,12 @@ BEGIN {
     chdir 't' if -d 't';
     @INC = '../lib';
     require './test.pl';
-    plan( tests => 82 );
+    plan( tests => 78 );
 }
 
 my @c;
 
-BEGIN { print "# Tests with caller(0)\n"; }
+print "# Tests with caller(0)\n";
 
 @c = caller(0);
 ok( (!@c), "caller(0) in main program" );
@@ -31,14 +31,8 @@ ok( $c[4], "hasargs true with anon sub" );
 sub foo { @c = caller(0) }
 my $fooref = delete $::{foo};
 $fooref -> ();
-is( $c[3], "main::__ANON__", "deleted subroutine name" );
-ok( $c[4], "hasargs true with deleted sub" );
-
-BEGIN {
- require strict;
- is +(caller 0)[1], __FILE__,
-  "[perl #68712] filenames after require in a BEGIN block"
-}
+is( $c[3], "(unknown)", "unknown subroutine name" );
+ok( $c[4], "hasargs true with unknown sub" );
 
 print "# Tests with caller(1)\n";
 
@@ -66,8 +60,8 @@ ok( $c[4], "hasargs true with anon sub" );
 sub foo2 { f() }
 my $fooref2 = delete $::{foo2};
 $fooref2 -> ();
-is( $c[3], "main::__ANON__", "deleted subroutine name" );
-ok( $c[4], "hasargs true with deleted sub" );
+is( $c[3], "(unknown)", "unknown subroutine name" );
+ok( $c[4], "hasargs true with unknown sub" );
 
 # See if caller() returns the correct warning mask
 
@@ -108,11 +102,8 @@ sub testwarn {
 	$registered = $default;
 	vec($registered, $warnings::LAST_BIT/2, 2) = 1;
     }
-
-    # The repetition number must be set to the value of $BYTES in
-    # lib/warnings.pm
-    BEGIN { check_bits( ${^WARNING_BITS}, "\0" x 13, 'all bits off via "no warnings"' ) }
-    testwarn("\0" x 13, 'no bits');
+    BEGIN { check_bits( ${^WARNING_BITS}, "\0" x 12, 'all bits off via "no warnings"' ) }
+    testwarn("\0" x 12, 'no bits');
 
     use warnings;
     BEGIN { check_bits( ${^WARNING_BITS}, $default,
@@ -170,59 +161,6 @@ sub hint_fetch {
     my $level = shift;
     my @results = caller($level||0);
     $results[10]->{$key};
-}
-
-{
-    my $tmpfile = tempfile();
-
-    open my $fh, '>', $tmpfile or die "open $tmpfile: $!";
-    print $fh <<'EOP';
-#!perl -wl
-use strict;
-
-{
-    package KAZASH ;
-
-    sub DESTROY {
-	print "DESTROY";
-    }
-}
-
-@DB::args = bless [], 'KAZASH';
-
-print $^P;
-print scalar @DB::args;
-
-{
-    local $^P = shift;
-}
-
-@DB::args = (); # At this point, the object should be freed.
-
-print $^P;
-print scalar @DB::args;
-
-# It shouldn't leak.
-EOP
-    close $fh;
-
-    foreach (0, 1) {
-        my $got = runperl(progfile => $tmpfile, args => [$_]);
-        $got =~ s/\s+/ /gs;
-        like($got, qr/\s*0 1 DESTROY 0 0\s*/,
-             "\@DB::args doesn't leak with \$^P = $_");
-    }
-}
-
-# This also used to leak [perl #97010]:
-{
-    my $gone;
-    sub fwib::DESTROY { ++$gone }
-    package DB;
-    sub { () = caller(0) }->(); # initialise PL_dbargs
-    @args = bless[],'fwib';
-    sub { () = caller(0) }->(); # clobber @args without initialisation
-    ::is $gone, 1, 'caller does not leak @DB::args elems when AvREAL';
 }
 
 $::testing_caller = 1;

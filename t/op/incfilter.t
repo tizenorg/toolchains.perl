@@ -5,15 +5,21 @@
 BEGIN {
     chdir 't' if -d 't';
     @INC = qw(. ../lib);
-    require 'test.pl';
-    skip_all_if_miniperl('no dynamic loading on miniperl, no Filter::Util::Call');
-    skip_all_without_perlio();
+    if ($ENV{PERL_CORE_MINITEST}) {
+        print "1..0 # Skip: no dynamic loading on miniperl\n";
+        exit 0;
+    }
+    unless (find PerlIO::Layer 'perlio') {
+	print "1..0 # Skip: not perlio\n";
+	exit 0;
+    }
+    require "test.pl";
 }
 use strict;
 use Config;
 use Filter::Util::Call;
 
-plan(tests => 145);
+plan(tests => 141);
 
 unshift @INC, sub {
     no warnings 'uninitialized';
@@ -195,7 +201,7 @@ do [$fh, sub {$_ .= $_ . $_; return;}] or die;
 do \"pass\n(\n'Scalar references are treated as initial file contents'\n)\n"
 or die;
 
-open $fh, "<", \"ss('The file is concatenated');";
+open $fh, "<", \"ss('The file is concatentated');";
 
 do [\'pa', $fh] or die;
 
@@ -215,35 +221,3 @@ do [\'pa', \&generator_with_state,
     ["ss('And generators which take state');\n",
      "pass('And return multiple lines');\n",
     ]] or die;
-
-# d8723a6a74b2c12e wasn't perfect, as the char * returned by SvPV*() can be
-# a temporary, freed at the next FREETMPS. And there is a FREETMPS in
-# pp_require
-
-for (0 .. 1) {
-    # Need both alternatives on the regexp, because currently the logic in
-    # pp_require for what is written to %INC is somewhat confused
-    open $fh, "<",
-	\'like(__FILE__, qr/(?:GLOB|CODE)\(0x[0-9a-f]+\)/, "__FILE__ is valid");';
-    do $fh or die;
-}
-
-# [perl #91880] $_ marked TEMP or having the wrong refcount inside a
-{ #             filter sub
-    local @INC; local $|;
-    unshift @INC, sub { sub { undef *_; --$| }};
-    do "dah";
-    pass '$_ has the right refcount inside a filter sub';
-
-    my $temps = 0;
-    @INC = sub { sub {
-	my $temp = \sub{$_}->();
-	$temps++ if $temp == \$_;
-	$_ = "a" unless $|;
-	return --$|
-    }};
-    local $^W;
-    do "dah";
-
-    is $temps, 0, '$_ is not marked TEMP';
-}

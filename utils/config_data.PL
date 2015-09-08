@@ -35,7 +35,7 @@ use File::Spec;
 
 my $script = File::Spec->catfile(
             File::Spec->catdir(
-                File::Spec->updir, qw[cpan Module-Build bin]
+                File::Spec->updir, qw[cpan Module-Build scripts]
             ), "config_data");
 
 if (open(IN, $script)) {

@@ -1,10 +1,17 @@
-#!./perl -w
+
 # Test hyperlinks et al from Pod::ParseUtils
 
-use Test::More tests => 22;
+BEGIN {
+        chdir 't' if -d 't';
+        @INC = '../lib';
+        require Test; import Test;
+        plan(tests => 22);
+}
 
 use strict;
 use Pod::ParseUtils;
+
+# First test the hyperlinks
 
 my @links = qw{
   name
@@ -32,11 +39,11 @@ my @results = (
 	       "Q<text>",
 	      );
 
-is(@results, @links, 'sanity check - array lengths equal?');
+ok(@results,@links);
 
 for my $i( 0..@links ) {
   my $link = new Pod::Hyperlink( $links[$i] );
-  is($link->markup, $results[$i], "test hyperlink $i");
+  ok($link->markup, $results[$i]);
 }
 
 # Now test lists
@@ -49,9 +56,9 @@ my $list = new Pod::List( -indent => 4,
 
 ok($list);
 
-is($list->indent, 4);
-is($list->start, 52);
-is($list->type, "OL");
+ok($list->indent, 4);
+ok($list->start, 52);
+ok($list->type, "OL");
 
 
 # Pod::Cache
@@ -67,15 +74,19 @@ $cache->item(
 	     -file => "file.t",
  );
 
+# Now look for an item of this name
 my $item = $cache->find_page("Pod::ParseUtils");
-ok($item, 'found item of this name');
+ok($item);
 
-is($cache->find_page("Junk"), undef, 'expect to find nothing');
+# and a failure
+ok($cache->find_page("Junk"), undef);
 
+# Make sure that the item we found is the same one as the
+# first in the list
 my @i = $cache->item;
-is($i[0], $item, 'item we found is the same one as the first in the list');
+ok($i[0], $item);
 
 # Check the contents
-is($item->page, "Pod::ParseUtils");
-is($item->description, "A description");
-is($item->file, "file.t");
+ok($item->page, "Pod::ParseUtils");
+ok($item->description, "A description");
+ok($item->file, "file.t");

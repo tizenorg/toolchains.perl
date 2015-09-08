@@ -20,19 +20,20 @@ my $keep_files = 0;
 $| = 1;
 
 # Because were are going to be changing directory before running Makefile.PL
+my $perl = $^X;
 # 5.005 doesn't have new enough File::Spec to have rel2abs. But actually we
 # only need it when $^X isn't absolute, which is going to be 5.8.0 or later
 # (where ExtUtils::Constant is in the core, and tests against the uninstalled
 # perl)
-my $perl = $] < 5.006 ? $^X : File::Spec->rel2abs($^X);
+$perl = File::Spec->rel2abs ($perl) unless $] < 5.006;
 # ExtUtils::Constant::C_constant uses $^X inside a comment, and we want to
 # compare output to ensure that it is the same. We were probably run as ./perl
 # whereas we will run the child with the full path in $perl. So make $^X for
 # us the same as our child will see.
 $^X = $perl;
-# 5.005 doesn't have rel2abs, but also doesn't need to load an uninstalled
-# module from blib
-@INC = map {File::Spec->rel2abs($_)} @INC if $] < 5.007 && $] >= 5.006;
+my $lib = $ENV{PERL_CORE} ? '../../../lib' : '../../blib/lib';
+my $runperl = "$perl \"-I$lib\"";
+print "# perl=$perl\n";
 
 my $make = $Config{make};
 $make = $ENV{MAKE} if exists $ENV{MAKE};
@@ -148,9 +149,9 @@ sub check_for_bonus_files {
 sub build_and_run {
   my ($tests, $expect, $files) = @_;
   my $core = $ENV{PERL_CORE} ? ' PERL_CORE=1' : '';
-  my @perlout = `$perl Makefile.PL $core`;
+  my @perlout = `$runperl Makefile.PL $core`;
   if ($?) {
-    print "not ok $realtest # $perl Makefile.PL failed: $?\n";
+    print "not ok $realtest # $runperl Makefile.PL failed: $?\n";
     print "# $_" foreach @perlout;
     exit($?);
   } else {
@@ -260,14 +261,14 @@ sub build_and_run {
 	      print REGENTMP $_ if $saw_shebang;
 	  }
 	  close XS;  close REGENTMP;
-	  $regen = `$perl regentmp`;
+	  $regen = `$runperl regentmp`;
 	  unlink 'regentmp';
       }
       else {
-	  $regen = `$perl -x $package.xs`;
+	  $regen = `$runperl -x $package.xs`;
       }
       if ($?) {
-	  print "not ok $realtest # $perl -x $package.xs failed: $?\n";
+	  print "not ok $realtest # $runperl -x $package.xs failed: $?\n";
 	  } else {
 	      print "ok $realtest - regen\n";
 	  }
@@ -367,9 +368,6 @@ sub MANIFEST {
 sub write_and_run_extension {
   my ($name, $items, $export_names, $package, $header, $testfile, $num_tests,
       $wc_args) = @_;
-
-  local *C;
-  local *XS;
 
   my $c = tie *C, 'TieOut';
   my $xs = tie *XS, 'TieOut';
@@ -635,28 +633,14 @@ if ($farthing == 0.25) {
 }
 $test++;
 
-EOT
-
-  my $cond;
-  if ($] >= 5.006 || $Config{longsize} < 8) {
-    $cond = '$not_zero > 0 && $not_zero == ~0';
-  } else {
-    $cond = q{pack 'Q', $not_zero eq ~pack 'Q', 0};
-  }
-
-  $test_body .= sprintf <<'EOT', $cond;
 # UV
 my $not_zero = NOT_ZERO;
-if (%s) {
+if ($not_zero > 0 && $not_zero == ~0) {
   print "ok $test\n";
 } else {
   print "not ok $test # \$not_zero=$not_zero ~0=" . (~0) . "\n";
 }
 $test++;
-
-EOT
-
-  $test_body .= <<'EOT';
 
 # Value includes a "*/" in an attempt to bust out of a C comment.
 # Also tests custom cpp #if clauses

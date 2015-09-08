@@ -54,26 +54,28 @@ LDLIBPTH = $ldlibpth
 ## In the following dollars and backticks do not need the extra backslash.
 $spitshell >>Makefile <<'!NO!SUBS!'
 
+CONVERTERS = pod2html pod2latex pod2man pod2text \
+		pod2usage podchecker podselect
+
 HTMLROOT = /	# Change this to fix cross-references in HTML
-POD2HTML_ARGS = --htmlroot=$(HTMLROOT) \
+POD2HTML = pod2html \
+	    --htmlroot=$(HTMLROOT) \
 	    --podroot=.. --podpath=pod:lib:ext:vms \
 	    --libpods=perlfunc:perlguts:perlvar:perlrun:perlop
-POD2HTML = ../ext/Pod-Html/pod2html
-POD2MAN = ../cpan/podlators/pod2man
-POD2LATEX = ../cpan/Pod-LaTeX/pod2latex
-PODCHECKER =  ../cpan/Pod-Parser/podchecker
 
 PERL = ../miniperl
 PERLILIB = $(PERL) -I../lib
 REALPERL = ../perl
 
-all: man
+all: $(CONVERTERS) man
 
-man:	$(POD2MAN) $(MAN)
+converters: $(CONVERTERS)
 
-html:	$(POD2HTML) $(HTML)
+man:	pod2man $(MAN)
 
-tex:	$(POD2LATEX) $(TEX)
+html:	pod2html $(HTML)
+
+tex:	pod2latex $(TEX)
 
 toc perltoc.pod:	buildtoc
 	$(PERLILIB) buildtoc --build-toc
@@ -82,27 +84,27 @@ toc perltoc.pod:	buildtoc
 
 .SUFFIXES: .man
 
-.pm.man:     $(POD2MAN)
-	$(REALPERL) -I../lib $(POD2MAN) $*.pm >$*.man
+.pm.man:     pod2man
+	$(REALPERL) -I../lib pod2man $*.pm >$*.man
 
-.pod.man:     $(POD2MAN)
-	$(REALPERL) -I../lib $(POD2MAN) $*.pod >$*.man
+.pod.man:     pod2man
+	$(REALPERL) -I../lib pod2man $*.pod >$*.man
 
 .SUFFIXES: .html
 
-.pm.html:    $(POD2HTML)
-	$(PERL) -I../lib $(POD2HTML) $(POD2HTML_ARGS) --infile=$*.pm --outfile=$*.html
+.pm.html:    pod2html
+	$(PERL) -I../lib $(POD2HTML) --infile=$*.pm --outfile=$*.html
 
-.pod.html:    $(POD2HTML)
-	$(PERL) -I../lib $(POD2HTML) $(POD2HTML_ARGS) --infile=$*.pod --outfile=$*.html
+.pod.html:    pod2html
+	$(PERL) -I../lib $(POD2HTML) --infile=$*.pod --outfile=$*.html
 
 .SUFFIXES: .tex
 
-.pm.tex: $(POD2LATEX)
-	$(PERL) -I../lib $(POD2LATEX) $*.pm
+.pm.tex: pod2latex
+	$(PERL) -I../lib pod2latex $*.pm
 
-.pod.tex: $(POD2LATEX)
-	$(PERL) -I../lib $(POD2LATEX) $*.pod
+.pod.tex: pod2latex
+	$(PERL) -I../lib pod2latex $*.pod
 
 clean:
 	rm -f $(MAN)
@@ -112,13 +114,37 @@ clean:
 	rm -f *.aux *.log *.exe
 
 realclean:	clean
+	rm -f $(CONVERTERS)
 
 distclean:	realclean
 
 veryclean:	distclean
 	-rm -f *~ *.orig
 
-check:	$(PODCHECKER)
+check:	podchecker
 	@echo "checking..."; \
-	$(PERL) -I../lib $(PODCHECKER) $(POD)
+	$(PERL) -I../lib podchecker $(POD)
+
+# Dependencies.
+pod2latex:	pod2latex.PL ../lib/Config.pm
+	$(LDLIBPTH) $(PERL) -I../lib pod2latex.PL
+
+pod2html:	pod2html.PL ../lib/Config.pm
+	$(LDLIBPTH) $(PERL) -I ../lib pod2html.PL
+
+pod2man:	pod2man.PL ../lib/Config.pm
+	$(LDLIBPTH) $(PERL) -I ../lib pod2man.PL
+
+pod2text:	pod2text.PL ../lib/Config.pm
+	$(LDLIBPTH) $(PERL) -I ../lib pod2text.PL
+
+pod2usage:	pod2usage.PL ../lib/Config.pm
+	$(PERL) -I ../lib pod2usage.PL
+
+podchecker:	podchecker.PL ../lib/Config.pm
+	$(PERL) -I ../lib podchecker.PL
+
+podselect:	podselect.PL ../lib/Config.pm
+	$(PERL) -I ../lib podselect.PL
+
 !NO!SUBS!

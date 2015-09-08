@@ -4,12 +4,12 @@ use strict;
 use warnings;
 
 require Tie::Hash;
-require XSLoader;
+use XSLoader ();
 
 our @ISA = qw(Tie::Hash);
-our $VERSION = "1.09";
+our $VERSION = "1.06";
 
-XSLoader::load();
+XSLoader::load 'SDBM_File', $VERSION;
 
 1;
 

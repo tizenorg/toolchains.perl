@@ -6,111 +6,107 @@ BEGIN {
     require './test.pl';
 }
 
-plan(tests => 118);
+print "1..106\n";
 
-eval 'pass();';
+eval 'print "ok 1\n";';
 
-is($@, '');
+if ($@ eq '') {print "ok 2\n";} else {print "not ok 2\n";}
 
 eval "\$foo\n    = # this is a comment\n'ok 3';";
-is($foo, 'ok 3');
+print $foo,"\n";
 
 eval "\$foo\n    = # this is a comment\n'ok 4\n';";
-is($foo, "ok 4\n");
+print $foo;
 
 print eval '
 $foo =;';		# this tests for a call through yyerror()
-like($@, qr/line 2/);
+if ($@ =~ /line 2/) {print "ok 5\n";} else {print "not ok 5\n";}
 
 print eval '$foo = /';	# this tests for a call through fatal()
-like($@, qr/Search/);
+if ($@ =~ /Search/) {print "ok 6\n";} else {print "not ok 6\n";}
 
-is(eval '"ok 7\n";', "ok 7\n");
+print eval '"ok 7\n";';
+
+# calculate a factorial with recursive evals
 
 $foo = 5;
 $fact = 'if ($foo <= 1) {1;} else {push(@x,$foo--); (eval $fact) * pop(@x);}';
 $ans = eval $fact;
-is($ans, 120, 'calculate a factorial with recursive evals');
+if ($ans == 120) {print "ok 8\n";} else {print "not ok 8\n";}
 
 $foo = 5;
 $fact = 'local($foo)=$foo; $foo <= 1 ? 1 : $foo-- * (eval $fact);';
 $ans = eval $fact;
-is($ans, 120, 'calculate a factorial with recursive evals');
+if ($ans == 120) {print "ok 9\n";} else {print "not ok 9 $ans\n";}
 
-my $curr_test = curr_test();
 my $tempfile = tempfile();
 open(try,'>',$tempfile);
-print try 'print "ok $curr_test\n";',"\n";
+print try 'print "ok 10\n";',"\n";
 close try;
 
 do "./$tempfile"; print $@;
 
 # Test the singlequoted eval optimizer
 
-$i = $curr_test + 1;
+$i = 11;
 for (1..3) {
     eval 'print "ok ", $i++, "\n"';
 }
 
-$curr_test += 4;
-
 eval {
-    print "ok $curr_test\n";
-    die sprintf "ok %d\n", $curr_test + 2;
+    print "ok 14\n";
+    die "ok 16\n";
     1;
-} || printf "ok %d\n$@", $curr_test + 1;
-
-curr_test($curr_test + 3);
+} || print "ok 15\n$@";
 
 # check whether eval EXPR determines value of EXPR correctly
 
 {
   my @a = qw(a b c d);
   my @b = eval @a;
-  is("@b", '4');
-  is($@, '');
+  print "@b" eq '4' ? "ok 17\n" : "not ok 17\n";
+  print $@ ? "not ok 18\n" : "ok 18\n";
 
   my $a = q[defined(wantarray) ? (wantarray ? ($b='A') : ($b='S')) : ($b='V')];
   my $b;
   @a = eval $a;
-  is("@a", 'A');
-  is(  $b, 'A');
+  print "@a" eq 'A' ? "ok 19\n" : "# $b\nnot ok 19\n";
+  print   $b eq 'A' ? "ok 20\n" : "# $b\nnot ok 20\n";
   $_ = eval $a;
-  is(  $b, 'S');
+  print   $b eq 'S' ? "ok 21\n" : "# $b\nnot ok 21\n";
   eval $a;
-  is(  $b, 'V');
+  print   $b eq 'V' ? "ok 22\n" : "# $b\nnot ok 22\n";
 
   $b = 'wrong';
   $x = sub {
      my $b = "right";
-     is(eval('"$b"'), $b);
+     print eval('"$b"') eq $b ? "ok 23\n" : "not ok 23\n";
   };
   &$x();
 }
 
-{
-  my $b = 'wrong';
-  my $X = sub {
-     my $b = "right";
-     is(eval('"$b"'), $b);
-  };
-  &$X();
-}
+my $b = 'wrong';
+my $X = sub {
+   my $b = "right";
+   print eval('"$b"') eq $b ? "ok 24\n" : "not ok 24\n";
+};
+&$X();
+
 
 # check navigation of multiple eval boundaries to find lexicals
 
-my $x = 'aa';
+my $x = 25;
 eval <<'EOT'; die if $@;
   print "# $x\n";	# clone into eval's pad
   sub do_eval1 {
      eval $_[0]; die if $@;
   }
 EOT
-do_eval1('is($x, "aa")');
+do_eval1('print "ok $x\n"');
 $x++;
-do_eval1('eval q[is($x, "ab")]');
+do_eval1('eval q[print "ok $x\n"]');
 $x++;
-do_eval1('sub { print "# $x\n"; eval q[is($x, "ac")] }->()');
+do_eval1('sub { print "# $x\n"; eval q[print "ok $x\n"] }->()');
 $x++;
 
 # calls from within eval'' should clone outer lexicals
@@ -119,11 +115,12 @@ eval <<'EOT'; die if $@;
   sub do_eval2 {
      eval $_[0]; die if $@;
   }
-do_eval2('is($x, "ad")');
+do_eval2('print "ok $x\n"');
 $x++;
-do_eval2('eval q[is($x, "ae")]');
+do_eval2('eval q[print "ok $x\n"]');
 $x++;
-do_eval2('sub { print "# $x\n"; eval q[is($x, "af")] }->()');
+do_eval2('sub { print "# $x\n"; eval q[print "ok $x\n"] }->()');
+$x++;
 EOT
 
 # calls outside eval'' should NOT clone lexicals from called context
@@ -138,61 +135,60 @@ eval <<'EOT'; die if $@;
 EOT
 {
     my $ok = 'not ok';
-    do_eval3('is($ok, q{ok})');
-    do_eval3('eval q[is($ok, q{ok})]');
-    do_eval3('sub { eval q[is($ok, q{ok})] }->()');
+    do_eval3('print "$ok ' . $x++ . '\n"');
+    do_eval3('eval q[print "$ok ' . $x++ . '\n"]');
+    do_eval3('sub { eval q[print "$ok ' . $x++ . '\n"] }->()');
 }
 
+# can recursive subroutine-call inside eval'' see its own lexicals?
+sub recurse {
+  my $l = shift;
+  if ($l < $x) {
+     ++$l;
+     eval 'print "# level $l\n"; recurse($l);';
+     die if $@;
+  }
+  else {
+    print "ok $l\n";
+  }
+}
 {
-    my $x = curr_test();
-    my $got;
-    sub recurse {
-	my $l = shift;
-	if ($l < $x) {
-	    ++$l;
-	    eval 'print "# level $l\n"; recurse($l);';
-	    die if $@;
-	}
-	else {
-	    $got = "ok $l";
-	}
-    }
-    local $SIG{__WARN__} = sub { fail() if $_[0] =~ /^Deep recurs/ };
-    recurse(curr_test() - 5);
-
-    is($got, "ok $x",
-       "recursive subroutine-call inside eval'' see its own lexicals");
+  local $SIG{__WARN__} = sub { die "not ok $x\n" if $_[0] =~ /^Deep recurs/ };
+  recurse($x-5);
 }
+$x++;
 
-
+# do closures created within eval bind correctly?
 eval <<'EOT';
   sub create_closure {
     my $self = shift;
     return sub {
-       return $self;
+       print $self;
     };
   }
 EOT
-is(create_closure("good")->(), "good",
-   'closures created within eval bind correctly');
+create_closure("ok $x\n")->();
+$x++;
 
-$main::r = "good";
-sub terminal { eval '$r . q{!}' }
-is(do {
-   my $r = "bad";
-   eval 'terminal($r)';
-}, 'good!', 'lexical search terminates correctly at subroutine boundary');
-
+# does lexical search terminate correctly at subroutine boundary?
+$main::r = "ok $x\n";
+sub terminal { eval 'print $r' }
 {
-    # Have we cured panic which occurred with require/eval in die handler ?
-    local $SIG{__DIE__} = sub { eval {1}; die shift };
-    eval { die "wham_eth\n" };
-    is($@, "wham_eth\n");
+   my $r = "not ok $x\n";
+   eval 'terminal($r)';
 }
+$x++;
 
+# Have we cured panic which occurred with require/eval in die handler ?
+$SIG{__DIE__} = sub { eval {1}; die shift }; 
+eval { die "ok ".$x++,"\n" }; 
+print $@;
+
+# does scalar eval"" pop stack correctly?
 {
     my $c = eval "(1,2)x10";
-    is($c, '2222222222', 'scalar eval"" pops stack correctly');
+    print $c eq '2222222222' ? "ok $x\n" : "# $c\nnot ok $x\n";
+    $x++;
 }
 
 # return from eval {} should clear $@ correctly
@@ -202,7 +198,9 @@ is(do {
 	print "# eval { return } test\n";
 	return; # removing this changes behavior
     };
-    is($@, '', 'return from eval {} should clear $@ correctly');
+    print "not " if $@;
+    print "ok $x\n";
+    $x++;
 }
 
 # ditto for eval ""
@@ -212,7 +210,9 @@ is(do {
 	print "# eval q{ return } test\n";
 	return; # removing this changes behavior
     };
-    is($@, '', 'return from eval "" should clear $@ correctly');
+    print "not " if $@;
+    print "ok $x\n";
+    $x++;
 }
 
 # Check that eval catches bad goto calls
@@ -220,30 +220,34 @@ is(do {
 {
     eval {
 	eval { goto foo; };
-	like($@, qr/Can't "goto" into the middle of a foreach loop/,
-	     'eval catches bad goto calls');
+	print ($@ ? "ok 41\n" : "not ok 41\n");
 	last;
 	foreach my $i (1) {
-	    foo: fail('jumped into foreach');
+	    foo: print "not ok 41\n";
+	    print "# jumped into foreach\n";
 	}
     };
-    fail("Outer eval didn't execute the last");
-    diag($@);
+    print "not ok 41\n" if $@;
 }
 
 # Make sure that "my $$x" is forbidden
 # 20011224 MJD
 {
-    foreach (qw($$x @$x %$x $$$x)) {
-	eval 'my ' . $_;
-	isnt($@, '', "my $_ is forbidden");
-    }
+  eval q{my $$x};
+  print $@ ? "ok 42\n" : "not ok 42\n";
+  eval q{my @$x};
+  print $@ ? "ok 43\n" : "not ok 43\n";
+  eval q{my %$x};
+  print $@ ? "ok 44\n" : "not ok 44\n";
+  eval q{my $$$x};
+  print $@ ? "ok 45\n" : "not ok 45\n";
 }
 
+# [ID 20020623.002] eval "" doesn't clear $@
 {
     $@ = 5;
     eval q{};
-    cmp_ok(length $@, '==', 0, '[ID 20020623.002] eval "" doesn\'t clear $@');
+    print length($@) ? "not ok 46\t# \$\@ = '$@'\n" : "ok 46\n";
 }
 
 # DAPM Nov-2002. Perl should now capture the full lexical context during
@@ -254,7 +258,7 @@ my $zzz = 1;
 
 eval q{
     sub fred1 {
-	eval q{ is(eval '$zzz', 1); }
+	eval q{ print eval '$zzz' == 1 ? 'ok' : 'not ok', " $_[0]\n"}
     }
     fred1(47);
     { my $zzz = 2; fred1(48) }
@@ -262,7 +266,7 @@ eval q{
 
 eval q{
     sub fred2 {
-	is(eval('$zzz'), 1);
+	print eval('$zzz') == 1 ? 'ok' : 'not ok', " $_[0]\n";
     }
 };
 fred2(49);
@@ -274,7 +278,7 @@ fred2(49);
 sub do_sort {
     my $zzz = 2;
     my @a = sort
-	    { is(eval('$zzz'), 2); $a <=> $b }
+	    { print eval('$zzz') == 2 ? 'ok' : 'not ok', " 51\n"; $a <=> $b }
 	    2, 1;
 }
 do_sort();
@@ -295,45 +299,48 @@ eval q{
 	return $l * fred3($l-1);
     }
     my $r = fred3(5);
-    is($r, 120);
+    print $r == 120 ? 'ok' : 'not ok', " 52\n";
     $r = eval'fred3(5)';
-    is($r, 120);
+    print $r == 120 ? 'ok' : 'not ok', " 53\n";
     $r = 0;
     eval '$r = fred3(5)';
-    is($r, 120);
+    print $r == 120 ? 'ok' : 'not ok', " 54\n";
     $r = 0;
     { my $yyy = 4; my $zzz = 5; my $l = 6; $r = eval 'fred3(5)' };
-    is($r, 120);
+    print $r == 120 ? 'ok' : 'not ok', " 55\n";
 };
 my $r = fred3(5);
-is($r, 120);
+print $r == 120 ? 'ok' : 'not ok', " 56\n";
 $r = eval'fred3(5)';
-is($r, 120);
+print $r == 120 ? 'ok' : 'not ok', " 57\n";
 $r = 0;
 eval'$r = fred3(5)';
-is($r, 120);
+print $r == 120 ? 'ok' : 'not ok', " 58\n";
 $r = 0;
 { my $yyy = 4; my $zzz = 5; my $l = 6; $r = eval 'fred3(5)' };
-is($r, 120);
+print $r == 120 ? 'ok' : 'not ok', " 59\n";
 
 # check that goto &sub within evals doesn't leak lexical scope
 
 my $yyy = 2;
 
+my $test = 60;
 sub fred4 { 
     my $zzz = 3;
-    is($zzz, 3);
-    is(eval '$zzz', 3);
-    is(eval '$yyy', 2);
+    print +($zzz == 3  && eval '$zzz' == 3) ? 'ok' : 'not ok', " $test\n";
+    $test++;
+    print eval '$yyy' == 2 ? 'ok' : 'not ok', " $test\n";
+    $test++;
 }
 
 eval q{
     fred4();
     sub fred5 {
 	my $zzz = 4;
-	is($zzz, 4);
-	is(eval '$zzz', 4);
-	is(eval '$yyy', 2);
+	print +($zzz == 4  && eval '$zzz' == 4) ? 'ok' : 'not ok', " $test\n";
+	$test++;
+	print eval '$yyy' == 2 ? 'ok' : 'not ok', " $test\n";
+	$test++;
 	goto &fred4;
     }
     fred5();
@@ -342,16 +349,19 @@ fred5();
 { my $yyy = 88; my $zzz = 99; fred5(); }
 eval q{ my $yyy = 888; my $zzz = 999; fred5(); };
 
+# [perl #9728] used to dump core
 {
    $eval = eval 'sub { eval "sub { %S }" }';
    $eval->({});
-   pass('[perl #9728] used to dump core');
+   print "ok $test\n";
+   $test++;
 }
 
 # evals that appear in the DB package should see the lexical scope of the
 # thing outside DB that called them (usually the debugged code), rather
 # than the usual surrounding scope
 
+$test=79;
 our $x = 1;
 {
     my $x=2;
@@ -366,19 +376,27 @@ our $x = 1;
 }
 {
     my $x = 3;
-    is(db1(),      2);
-    is(DB::db2(),  2);
-    is(DB::db3(),  3);
-    is(DB::db4(),  3);
-    is(DB::db5(),  3);
-    is(db6(),      4);
+    print db1()     == 2 ? 'ok' : 'not ok', " $test\n"; $test++;
+    print DB::db2() == 2 ? 'ok' : 'not ok', " $test\n"; $test++;
+    print DB::db3() == 3 ? 'ok' : 'not ok', " $test\n"; $test++;
+    print DB::db4() == 3 ? 'ok' : 'not ok', " $test\n"; $test++;
+    print DB::db5() == 3 ? 'ok' : 'not ok', " $test\n"; $test++;
+    print db6()     == 4 ? 'ok' : 'not ok', " $test\n"; $test++;
 }
-
+require './test.pl';
+$NO_ENDING = 1;
 # [perl #19022] used to end up with shared hash warnings
 # The program should generate no output, so anything we see is on stderr
 my $got = runperl (prog => '$h{a}=1; foreach my $k (keys %h) {eval qq{\$k}}',
 		   stderr => 1);
-is ($got, '');
+
+if ($got eq '') {
+  print "ok $test\n";
+} else {
+  print "not ok $test\n";
+  _diag ("# Got '$got'\n");
+}
+$test++;
 
 # And a buggy way of fixing #19022 made this fail - $k became undef after the
 # eval for a build with copy on write
@@ -386,16 +404,26 @@ is ($got, '');
   my %h;
   $h{a}=1;
   foreach my $k (keys %h) {
-    is($k, 'a');
+    if (defined $k and $k eq 'a') {
+      print "ok $test\n";
+    } else {
+      print "not $test # got ", _q ($k), "\n";
+    }
+    $test++;
 
     eval "\$k";
 
-    is($k, 'a');
+    if (defined $k and $k eq 'a') {
+      print "ok $test\n";
+    } else {
+      print "not $test # got ", _q ($k), "\n";
+    }
+    $test++;
   }
 }
 
 sub Foo {} print Foo(eval {});
-pass('#20798 (used to dump core)');
+print "ok ",$test++," - #20798 (used to dump core)\n";
 
 # check for context in string eval
 {
@@ -406,11 +434,11 @@ pass('#20798 (used to dump core)');
   @r = qw( a b );
   $r = 'ab';
   @r = eval $code;
-  is("@r$c", 'AA', 'string eval list context');
+  print "@r$c" eq 'AA' ? "ok " : "# '@r$c' ne 'AA'\nnot ok ", $test++, "\n";
   $r = eval $code;
-  is("$r$c", 'SS', 'string eval scalar context');
+  print "$r$c" eq 'SS' ? "ok " : "# '$r$c' ne 'SS'\nnot ok ", $test++, "\n";
   eval $code;
-  is("$c", 'V', 'string eval void context');
+  print   $c   eq 'V'  ? "ok " : "# '$c' ne 'V'\nnot ok ", $test++, "\n";
 }
 
 # [perl #34682] escaping an eval with last could coredump or dup output
@@ -420,21 +448,25 @@ $got = runperl (
     'sub A::TIEARRAY { L: { eval { last L } } } tie @a, A; warn qq(ok\n)',
 stderr => 1);
 
-is($got, "ok\n", 'eval and last');
+print "not " unless $got eq "ok\n";
+print "ok $test - eval and last\n"; $test++;
 
 # eval undef should be the same as eval "" barring any warnings
 
 {
     local $@ = "foo";
     eval undef;
-    is($@, "", 'eval undef');
+    print "not " unless $@ eq "";
+    print "ok $test # eval undef \n"; $test++;
 }
 
 {
     no warnings;
-    eval "/ /b;";
-    like($@, qr/^syntax error/, 'eval syntax error, no warnings');
+    eval "/ /a;";
+    print "not " unless $@ =~ /^syntax error/;
+    print "ok $test # eval syntax error, no warnings \n"; $test++;
 }
+
 
 # a syntax error in an eval called magically 9eg vie tie or overload)
 # resulted in an assertion failure in S_docatch, since doeval had already
@@ -450,8 +482,10 @@ is($got, "ok\n", 'eval and last');
     my $x;
     tie $x, bless [];
     $x = 1;
-    ::is($ok, 1, 'eval docatch');
+    print "not " unless $ok;
+    print "ok $test # eval docatch \n"; $test++;
 }
+
 
 # [perl #51370] eval { die "\x{a10d}" } followed by eval { 1 } did not reset
 # length $@ 
@@ -460,46 +494,56 @@ eval { die "\x{a10d}"; };
 $_ = length $@;
 eval { 1 };
 
-cmp_ok($@, 'eq', "", 'length of $@ after eval');
-cmp_ok(length $@, '==', 0, 'length of $@ after eval');
+print "not " if ($@ ne "");
+print "ok $test # length of \$@ after eval\n"; $test++;
 
-# Check if eval { 1 }; completely resets $@
-SKIP: {
-    skip_if_miniperl('no dynamic loading on miniperl, no Devel::Peek', 2);
-    require Config;
-    skip('Devel::Peek was not built', 2)
-	unless $Config::Config{extensions} =~ /\bDevel\/Peek\b/;
+print "not " if (length $@ != 0);
+print "ok $test # length of \$@ after eval\n"; $test++;
 
-    my $tempfile = tempfile();
-    open $prog, ">", $tempfile or die "Can't create test file";
-    print $prog <<'END_EVAL_TEST';
+# Check if eval { 1 }; compeltly resets $@
+if (eval "use Devel::Peek; 1;") {
+  $tempfile = tempfile();
+  $outfile = tempfile();
+  open PROG, ">", $tempfile or die "Can't create test file";
+  my $prog = <<'END_EVAL_TEST';
     use Devel::Peek;
     $! = 0;
     $@ = $!;
-    Dump($@);
-    print STDERR "******\n";
-    eval { die "\x{a10d}"; };
-    $_ = length $@;
-    eval { 1 };
-    Dump($@);
-    print STDERR "******\n";
-    print STDERR "Done\n";
+    my $ok = 0;
+    open(SAVERR, ">&STDERR") or die "Can't dup STDERR: $!";
+    if (open(OUT, '>', '@@@@')) {
+      open(STDERR, ">&OUT") or die "Can't dup OUT: $!";
+      Dump($@);
+      print STDERR "******\n";
+      eval { die "\x{a10d}"; };
+      $_ = length $@;
+      eval { 1 };
+      Dump($@);
+      open(STDERR, ">&SAVERR") or die "Can't restore STDERR: $!";
+      close(OUT);
+      if (open(IN, '<', '@@@@')) {
+        local $/;
+        my $in = <IN>;
+        my ($first, $second) = split (/\*\*\*\*\*\*\n/, $in, 2);
+        $first =~ s/,pNOK//;
+        $ok = 1 if ($first eq $second);
+      }
+    }
+
+    print $ok;
 END_EVAL_TEST
-    close $prog or die "Can't close $tempfile: $!";
-    my $got = runperl(progfile => $tempfile, stderr => 1);
-    my ($first, $second, $tombstone) = split (/\*\*\*\*\*\*\n/, $got);
+    $prog =~ s/\@\@\@\@/$outfile/g;
+    print PROG $prog;
+   close PROG;
 
-    is($tombstone, "Done\n", 'Program completed successfully');
-
-    $first =~ s/,pNOK//;
-    s/ PV = 0x[0-9a-f]+/ PV = 0x/ foreach $first, $second;
-    s/ LEN = [0-9]+/ LEN = / foreach $first, $second;
-    # Dump may double newlines through pipes, though not files
-    # which is what this test used to use.
-    $second =~ s/ IV = 0\n\n/ IV = 0\n/ if $^O eq 'VMS';
-
-    is($second, $first, 'eval { 1 } completely resets $@');
+   my $ok = runperl(progfile => $tempfile);
+   print "not " unless $ok;
+   print "ok $test # eval { 1 } completly resets \$@\n";
 }
+else {
+  print "ok $test # skipped - eval { 1 } completly resets \$@\n";
+}
+$test++;
 
 # Test that "use feature" and other hint transmission in evals and s///ee
 # don't leak memory
@@ -509,8 +553,12 @@ END_EVAL_TEST
     my $t;
     my $s = "a";
     $s =~ s/a/$t = \%^H;  qq( qq() );/ee;
-    is(Internals::SvREFCNT(%$t), $count_expected, 'RT 63110');
+    print "not " if Internals::SvREFCNT(%$t) != $count_expected;
+    print "ok $test - RT 63110\n";
+    $test++;
 }
+
+curr_test($test);
 
 {
     # test that the CV compiled for the eval is freed by checking that no additional 
@@ -554,16 +602,3 @@ eval q{ eval { + } };
 print "ok\n";
 EOP
 
-fresh_perl_is(<<'EOP', "ok\n", undef, 'assert fail on non-string in Perl_lex_start');
-use overload '""'  => sub { '1;' };
-my $ov = bless [];
-eval $ov;
-print "ok\n";
-EOP
-
-for my $k (!0) {
-  eval 'my $do_something_with = $k';
-  eval { $k = 'mon' };
-  is "a" =~ /a/, "1",
-    "string eval leaves readonly lexicals readonly [perl #19135]";
-}

@@ -22,7 +22,7 @@ use vars qw(@ISA @EXPORT_OK $VERSION);
 		show_results process_options files_to_modules
         finish_tap_output
 		reload_manifest);
-$VERSION = 0.05;
+$VERSION = 0.04;
 
 require Exporter;
 
@@ -82,27 +82,24 @@ sub expand_glob {
 		    @files;
 		}
 	    # The rest are globbable patterns; expand the glob, then
-	    # recursively perform directory expansion on any results
+	    # recurively perform directory expansion on any results
 	    : expand_glob(grep -e $_,glob($_))
 	    } @_;
 }
 
-sub filter_excluded {
-    my ($m, @files) = @_;
-
-    return @files
-	unless my $excluded = $Modules{$m}{EXCLUDED};
-
-    my ($pat) = map { qr/$_/ } join '|' => map {
-	ref $_ ? qr/\Q$_\E/ : $_
-    } @{ $excluded };
-
-    return grep { $_ !~ $pat } @files;
-}
-
 sub get_module_files {
     my $m = shift;
-    return filter_excluded $m => map { expand_glob($_) } get_module_pat($m);
+    my %exclude;
+    my @files;
+    for (get_module_pat($m)) {
+	if (s/^!//) {
+	    $exclude{$_}=1 for expand_glob($_);
+	}
+	else {
+	    push @files, expand_glob($_);
+	}
+    }
+    return grep !$exclude{$_}, @files;
 }
 
 

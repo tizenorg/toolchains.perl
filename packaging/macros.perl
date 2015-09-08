@@ -1,128 +1,150 @@
-# macros.perl file
-# macros for perl module building. handle with care.
-
-# Useful perl macros (from Artur Frysiak <wiget@t17.ds.pwr.wroc.pl>)
+# Sensible Perl-specific RPM build macros.
 #
-%perl_sitearch   %(eval "`%{__perl} -V:installsitearch`"; echo $installsitearch)
-%perl_sitelib    %(eval "`%{__perl} -V:installsitelib`"; echo $installsitelib)
-%perl_vendorarch %(eval "`%{__perl} -V:installvendorarch`"; echo $installvendorarch)
-%perl_vendorlib  %(eval "`%{__perl} -V:installvendorlib`"; echo $installvendorlib)
-%perl_archlib    %(eval "`%{__perl} -V:installarchlib`"; echo $installarchlib)
-%perl_privlib    %(eval "`%{__perl} -V:installprivlib`"; echo $installprivlib)
-
-# More useful perl macros (from Raul Dias <rsd@swi.com.br>)
+# Note that these depend on the generic filtering system being in place in
+# rpm core; but won't cause a build to fail if they're not present.
 #
-%perl_version           %(perl -V:version | sed "s!.*='!!;s!'.*!!")
-%perl_man1ext           %(perl -V:man1ext | sed "s!.*='!!;s!'.*!!")
-%perl_man3ext           %(perl -V:man3ext | sed "s!.*='!!;s!'.*!!")
-%perl_man1dir           %(perl -V:man1dir | sed "s!.*='!!;s!'.*!!")
-%perl_man3dir           %(perl -V:man3dir | sed "s!.*='!!;s!'.*!!")
-%perl_installman1dir    %(perl -V:installman1dir | sed "s!.*='!!;s!'.*!!")
-%perl_installman3dir    %(perl -V:installman3dir | sed "s!.*='!!;s!'.*!!")
-%perl_installarchlib    %(perl -V:installarchlib | sed "s!.*='!!;s!'.*!!")
-%perl_prefix            %{buildroot}
+# Chris Weyl <cweyl@alumni.drew.edu> 2009
 
-# Macro to encapsulate perl requires (empty for fedora and suse > 11.3)
-# we keep the complicated form even here to easy sync the other macros with
-# perl-macros package
-# 
-%perl_requires() \
-%if 0%{?suse_version} > 0 && 0%{?suse_version} < 1700 \
-Requires: perl = %{perl_version} \
-%endif
-
-# suse specific macros
+# This macro unsets several common vars used to control how Makefile.PL (et
+# al) build and install packages.  We also set a couple to help some of the
+# common systems be less interactive.  This was blatantly stolen from
+# cpanminus, and helps building rpms locally when one makes extensive use of
+# local::lib, etc.
 #
-%perl_make_install make DESTDIR=$RPM_BUILD_ROOT install_vendor
-%perl_process_packlist(n:) \
-  if test -n "$RPM_BUILD_ROOT" -a -d $RPM_BUILD_ROOT%perl_vendorarch/auto; then \
-    find $RPM_BUILD_ROOT%perl_vendorarch/auto -name .packlist -print0 | xargs -0 -r rm \
-    if [ %{_target_cpu} == noarch ]; then \
-      find $RPM_BUILD_ROOT%perl_vendorarch/auto -depth -type d -print0 | xargs -0 -r rmdir \
-    fi \
-  fi \
-  rm -f $RPM_BUILD_ROOT%{perl_archlib}/perllocal.pod \
-  %nil
-
-# macro: perl_gen_filelist (from Christian <chris@computersalat.de>)
-# do the rpmlint happy filelist generation
-# with %dir in front of directories
+# Usage, in %build, before "%{__perl} Makefile.PL ..."
 #
-%perl_gen_filelist(n)\
-FILES=%{name}.files\
-# fgen_dir func\
-# IN: dir\
-fgen_dir(){\
-%{__cat} >> $FILES << EOF\
-%dir ${1}\
-EOF\
-}\
-# fgen_file func\
-# IN: file\
-fgen_file(){\
-%{__cat} >> $FILES << EOF\
-${1}\
-EOF\
-}\
-# check for files in %{perl_vendorlib}\
-RES=`find ${RPM_BUILD_ROOT}%{perl_vendorlib} -maxdepth 1 -type f`\
-if [ -n "$RES" ]; then\
-  for file in $RES; do\
-    fgen_file "%{perl_vendorlib}/$(basename ${file})"\
-  done\
-fi\
-\
-# get all dirs into array\
-base_dir="${RPM_BUILD_ROOT}%{perl_vendorlib}/"\
-for dir in `find ${base_dir} -type d | sort`; do\
-  if [ "$dir" = "${base_dir}" ]; then\
-    continue\
-  else\
-    el=`echo $dir | %{__awk} -F"${base_dir}" '{print $2}'`\
-    all_dir=(${all_dir[@]} $el)\
-  fi\
+#   %{?perl_ext_env_unset}
+
+%perl_ext_env_unset %{expand:
+unset PERL_MM_OPT MODULEBUILDRC PERL5INC
+export PERL_AUTOINSTALL="--defaultdeps"
+export PERL_MM_USE_DEFAULT=1
+}
+
+#############################################################################
+# Filtering macro incantations
+
+# keep track of what "revision" of the filtering we're at.  Each time we
+# change the filter we should increment this.
+
+%perl_default_filter_revision 2
+
+# By default, for perl packages we want to filter all files in _docdir from 
+# req/prov scanning, as well as filtering out any provides caused by private 
+# libs in vendorarch/archlib (vendor/core).
+#
+# Note that this must be invoked in the spec file, preferably as 
+# "%{?perl_default_filter}", before any %description block.
+
+%perl_default_filter %{?filter_setup: %{expand: \
+%filter_provides_in %{perl_vendorarch}/.*\\.so$ \
+%filter_provides_in -P %{perl_archlib}/(?!CORE/libperl).*\\.so$ \
+%filter_from_provides /perl(UNIVERSAL)/d; /perl(DB)/d \
+%filter_provides_in %{_docdir} \
+%filter_requires_in %{_docdir} \
+%filter_setup \
+}}
+
+#############################################################################
+# Macros to assist with generating a "-tests" subpackage in a semi-automatic
+# manner.
+#
+# The following macros are still in a highly experimental stage and users
+# should be aware that the interface and behaviour may change. 
+#
+# PLEASE, PLEASE CONDITIONALIZE THESE MACROS IF YOU USE THEM.
+#
+# See http://gist.github.com/284409
+
+# These macros should be invoked as above, right before the first %description
+# section, and conditionalized.  e.g., for the common case where all our tests
+# are located under t/, the correct usage is:
+#
+#   %{?perl_default_subpackage_tests}
+#
+# If custom files/directories need to be specified, this can be done as such:
+#
+#   %{?perl_subpackage_tests:%perl_subpackage_tests t/ one/ three.sql}
+#
+# etc, etc.
+
+%perl_version   %(eval "`%{__perl} -V:version`"; echo $version)
+%perl_testdir   %{_libexecdir}/perl5-tests
+%cpan_dist_name %(eval echo %{name} | %{__sed} -e 's/^perl-//')
+
+# easily mark something as required by -tests and BR to the main package
+%tests_req() %{expand:\
+BuildRequires: %*\
+%%tests_subpackage_requires %*\
+}
+
+# fixup (and create if needed) the shbang lines in tests, so they work and
+# rpmlint doesn't (correctly) have a fit
+%fix_shbang_line() \
+TMPHEAD=`mktemp`\
+TMPBODY=`mktemp`\
+for file in %* ; do \
+    head -1 $file > $TMPHEAD\
+    tail -n +2 $file > $TMPBODY\
+    %{__perl} -pi -e '$f = /^#!/ ? "" : "#!%{__perl}$/"; $_="$f$_"' $TMPHEAD\
+    cat $TMPHEAD $TMPBODY > $file\
 done\
-\
-# build filelist\
-for i in ${all_dir[@]}; do\
-  # do not add "dir {perl_vendorlib/arch}/auto", included in perl package\
-  if [ "${i}" = "auto" ]; then\
-    continue\
-  fi\
-  if [ "%{perl_vendorlib}/${i}" = "%{perl_vendorarch}/auto" ]; then\
-    continue\
-  else\
-    if [ -d ${base_dir}/${i} ]; then\
-      RES=`find "${base_dir}/${i}" -maxdepth 1 -type f`\
-      if [ -n "$RES" ]; then\
-        fgen_dir "%{perl_vendorlib}/${i}"\
-        for file in $RES; do\
-          fgen_file "%{perl_vendorlib}/${i}/$(basename ${file})"\
-        done\
-      else\
-        fgen_dir "%{perl_vendorlib}/${i}"\
-      fi\
-    fi\
-  fi\
-done\
-# add man pages\
-# if exist :)\
-if [ -d "${RPM_BUILD_ROOT}%{_mandir}" ]; then\
-fgen_file "%{_mandir}/man?/*"\
-fi\
-\
-# add packlist file\
-# generated fom perllocal.pod\
-if [ -f "${RPM_BUILD_ROOT}/var/adm/perl-modules/%{name}" ]; then\
-  fgen_file "/var/adm/perl-modules/%{name}"\
-fi\
-\
-# check for files in %{_bindir}\
-if [ -d ${RPM_BUILD_ROOT}%{_bindir} ]; then\
-  RES=`find "${RPM_BUILD_ROOT}%{_bindir}" -maxdepth 1 -type f`\
-  if [ -n "$RES" ]; then\
-    for file in $RES; do\
-      fgen_file "%{_bindir}/$(basename ${file})"\
-    done\
-  fi\
-fi
+%{__perl} -MExtUtils::MakeMaker -e "ExtUtils::MM_Unix->fixin(qw{%*})"\
+%{__rm} $TMPHEAD $TMPBODY\
+%{nil}
+
+# additional -tests subpackage requires, if any
+%tests_subpackage_requires() %{expand: \
+%global __tests_spkg_req %{?__tests_spkg_req} %* \
+}
+
+# additional -tests subpackage provides, if any
+%tests_subpackage_provides() %{expand: \
+%global __tests_spkg_prov %{?__tests_spkg_prov} %* \
+}
+
+#
+# Runs after the body of %check completes.
+#
+
+%__perl_check_pre %{expand: \
+%{?__spec_check_pre} \
+pushd %{buildsubdir} \
+%define perl_br_testdir %{buildroot}%{perl_testdir}/%{cpan_dist_name} \
+%{__mkdir_p} %{perl_br_testdir} \
+%{__tar} -cf - %{__perl_test_dirs} | ( cd %{perl_br_testdir} && %{__tar} -xf - ) \
+find . -maxdepth 1 -type f -name '*META*' -exec %{__cp} -vp {} %{perl_br_testdir} ';' \
+find %{perl_br_testdir} -type f -exec %{__chmod} -c -x {} ';' \
+T_FILES=`find %{perl_br_testdir} -type f -name '*.t'` \
+%fix_shbang_line $T_FILES \
+%{__chmod} +x $T_FILES \
+%{_fixperms} %{perl_br_testdir} \
+popd \
+}
+
+#
+# The actual invoked macro
+#
+
+%perl_subpackage_tests() %{expand: \
+%global __perl_package 1\
+%global __perl_test_dirs %* \
+%global __spec_check_pre %{expand:%{__perl_check_pre}} \
+%package tests\
+Summary: Test suite for package %{name}\
+Group: Development/Debug\
+Requires: %{name} = %{?epoch:%{epoch}:}%{version}-%{release}\
+Requires: /usr/bin/prove \
+%{?__tests_spkg_req:Requires: %__tests_spkg_req}\
+%{?__tests_spkg_prov:Provides: %__tests_spkg_prov}\
+AutoReqProv: 0 \
+%description tests\
+This package provides the test suite for package %{name}.\
+%files tests\
+%defattr(-,root,root,-)\
+%{perl_testdir}\
+}
+
+# shortcut sugar
+%perl_default_subpackage_tests %perl_subpackage_tests t/
+

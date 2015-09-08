@@ -147,7 +147,23 @@ while (defined (my $file = next_file())) {
 		    s/^\s+//;
 		    expr();
 		    $new =~ s/(["\\])/\\$1/g;       #"]);
-		    EMIT($proto);
+		  EMIT:
+		    $new = reindent($new);
+		    $args = reindent($args);
+		    if ($t ne '') {
+			$new =~ s/(['\\])/\\$1/g;   #']);
+			if ($opt_h) {
+			    print OUT $t,
+                            "eval \"\\n#line $eval_index $outfile\\n\" . 'sub $name $proto\{\n$t    ${args}eval q($new);\n$t}' unless defined(\&$name);\n";
+                            $eval_index++;
+			} else {
+			    print OUT $t,
+                            "eval 'sub $name $proto\{\n$t    ${args}eval q($new);\n$t}' unless defined(\&$name);\n";
+			}
+		    } else {
+                      print OUT "unless(defined(\&$name)) {\n    sub $name $proto\{\n\t${args}eval q($new);\n    }\n}\n";
+		    }
+		    %curargs = ();
 		} else {
 		    s/^\s+//;
 		    expr();
@@ -364,7 +380,7 @@ while (defined (my $file = next_file())) {
 	    $new =~ s/&$_\b/\$$_/g for @local_variables;
 	    $new =~ s/(["\\])/\\$1/g;       #"]);
 	    # now that's almost like a macro (we hope)
-	    EMIT($proto);
+	    goto EMIT;
 	}
     }
     $Is_converted{$file} = 1;
@@ -384,33 +400,8 @@ if ($opt_e && (scalar(keys %bad_file) > 0)) {
 
 exit $Exit;
 
-sub EMIT {
-    my $proto = shift;
-
-    $new = reindent($new);
-    $args = reindent($args);
-    if ($t ne '') {
-    $new =~ s/(['\\])/\\$1/g;   #']);
-    if ($opt_h) {
-        print OUT $t,
-                    "eval \"\\n#line $eval_index $outfile\\n\" . 'sub $name $proto\{\n$t    ${args}eval q($new);\n$t}' unless defined(\&$name);\n";
-                    $eval_index++;
-    } else {
-        print OUT $t,
-                    "eval 'sub $name $proto\{\n$t    ${args}eval q($new);\n$t}' unless defined(\&$name);\n";
-    }
-    } else {
-              print OUT "unless(defined(\&$name)) {\n    sub $name $proto\{\n\t${args}eval q($new);\n    }\n}\n";
-    }
-    %curargs = ();
-    return;
-}
-
 sub expr {
-    if (/\b__asm__\b/) {	# freak out
-	$new = '"(assembly code)"';
-	return
-    }
+    $new = '"(assembly code)"' and return if /\b__asm__\b/; # freak out.
     my $joined_args;
     if(keys(%curargs)) {
 	$joined_args = join('|', keys(%curargs));
@@ -426,7 +417,7 @@ sub expr {
 		       # Croak if nv_preserves_uv_bits < 64 ?
 		       $new .=         hex(substr($hex, -8)) +
 			       2**32 * hex(substr($hex,  0, -8));
-		       # The above will produce "erroneous" code
+		       # The above will produce "errorneus" code
 		       # if the hex constant was e.g. inside UINT64_C
 		       # macro, but then again, h2ph is an approximation.
 		   } else {
@@ -779,7 +770,7 @@ sub inc_dirs
 sub build_preamble_if_necessary
 {
     # Increment $VERSION every time this function is modified:
-    my $VERSION     = 3;
+    my $VERSION     = 2;
     my $preamble    = "$Dest_dir/_h2ph_pre.ph";
 
     # Can we skip building the preamble file?
@@ -807,16 +798,7 @@ sub build_preamble_if_necessary
 		# parenthesized value:  d=(v)
 		$define{$_} = $1;
 	    }
-	    if (/^(\w+)\((\w)\)$/) {
-		my($macro, $arg) = ($1, $2);
-		my $def = $define{$_};
-		$def =~ s/$arg/\$\{$arg\}/g;
-		print PREAMBLE <<DEFINE;
-unless (defined &$macro) { sub $macro(\$) { my (\$$arg) = \@_; \"$def\" } }
-
-DEFINE
-	    } elsif
-		($define{$_} =~ /^([+-]?(\d+)?\.\d+([eE][+-]?\d+)?)[FL]?$/) {
+	    if ($define{$_} =~ /^([+-]?(\d+)?\.\d+([eE][+-]?\d+)?)[FL]?$/) {
 		# float:
 		print PREAMBLE
 		    "unless (defined &$_) { sub $_() { $1 } }\n\n";
@@ -825,14 +807,8 @@ DEFINE
 		print PREAMBLE
 		    "unless (defined &$_) { sub $_() { $1 } }\n\n";
 	    } elsif ($define{$_} =~ /^\w+$/) {
-		my $def = $define{$_};
-		if ($isatype{$def}) {
-		  print PREAMBLE
-		    "unless (defined &$_) { sub $_() { \"$def\" } }\n\n";
-		} else {
-		  print PREAMBLE
-		    "unless (defined &$_) { sub $_() { &$def } }\n\n";
-	        }
+		print PREAMBLE
+		    "unless (defined &$_) { sub $_() { &$define{$_} } }\n\n";
 	    } else {
 		print PREAMBLE
 		    "unless (defined &$_) { sub $_() { \"",

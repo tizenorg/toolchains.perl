@@ -28,7 +28,10 @@ while (<DATA>) {
     $code{$1} = $2;
 }
 
-open my $fh, '<', '../../regen/opcodes' or die "Can't open opcodes: $!";
+open my $fh, '<', '../../opcode.pl' or die "Can't open opcode.pl: $!";
+while (<$fh>) {
+    last if /^__END__/;
+}
 while (<$fh>) {
     chomp;
     next if !$_ or /^#/;

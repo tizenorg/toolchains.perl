@@ -6,9 +6,10 @@ use warnings;
 use Carp;
 
 require Exporter;
-require XSLoader;
+require DynaLoader;
+use AutoLoader;
 
-our @ISA = qw(Exporter);
+our @ISA = qw(Exporter DynaLoader);
 
 our @EXPORT = qw(langinfo);
 
@@ -72,9 +73,32 @@ our @EXPORT_OK = qw(
 	YESSTR
 );
 
-our $VERSION = '0.08';
+our $VERSION = '0.03';
 
-XSLoader::load();
+sub AUTOLOAD {
+    # This AUTOLOAD is used to 'autoload' constants from the constant()
+    # XS function.
+
+    my $constname;
+    our $AUTOLOAD;
+    ($constname = $AUTOLOAD) =~ s/.*:://;
+    croak "&I18N::Langinfo::constant not defined" if $constname eq 'constant';
+    my ($error, $val) = constant($constname);
+    if ($error) { croak $error; }
+    {
+	no strict 'refs';
+	# Fixed between 5.005_53 and 5.005_61
+#XXX	if ($] >= 5.00561) {
+#XXX	    *$AUTOLOAD = sub () { $val };
+#XXX	}
+#XXX	else {
+	    *$AUTOLOAD = sub { $val };
+#XXX	}
+    }
+    goto &$AUTOLOAD;
+}
+
+bootstrap I18N::Langinfo $VERSION;
 
 1;
 __END__

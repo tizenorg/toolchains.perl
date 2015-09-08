@@ -3,16 +3,15 @@
 BEGIN {
     chdir 't' if -d 't';
     @INC = qw(. ../lib);
-    require "test.pl";
-    skip_all_without_perlio();
 }
 
 use Config;
 
+require "test.pl";
 
 my $file = tempfile();
 
-{
+if (find PerlIO::Layer 'perlio') {
     plan(tests => 16);
     ok(open(FOO,">:crlf",$file));
     ok(print FOO 'a'.((('a' x 14).qq{\n}) x 2000) || close(FOO));
@@ -30,7 +29,8 @@ my $file = tempfile();
 
     SKIP:
     {
-	skip_if_miniperl("miniperl can't rely on loading PerlIO::scalar");
+	skip("miniperl can't rely on loading PerlIO::scalar")
+	if $ENV{PERL_CORE_MINITEST};
 	skip("no PerlIO::scalar") unless $Config{extensions} =~ m!\bPerlIO/scalar\b!;
 	require PerlIO::scalar;
 	my $fcontents = join "", map {"$_\015\012"} "a".."zzz";
@@ -41,7 +41,7 @@ my $file = tempfile();
 	seek $fh, $pos, 0;
 	$/ = "\n";
 	$s = <$fh>.<$fh>;
-	is($s, "\nxxy\n");
+	ok($s eq "\nxxy\n");
     }
 
     ok(close(FOO));
@@ -66,10 +66,13 @@ my $file = tempfile();
 	    close FOO;
 	    print join(" ", "#", map { sprintf("%02x", $_) } unpack("C*", $foo)),
 	    "\n";
-	    like($foo, qr/\x0d\x0a$/);
-	    unlike($foo, qr/\x0d\x0d/);
+	    ok($foo =~ /\x0d\x0a$/);
+	    ok($foo !~ /\x0d\x0d/);
 	}
     }
+}
+else {
+    skip_all("No perlio, so no :crlf");
 }
 
 sub count_chars {

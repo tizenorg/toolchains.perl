@@ -3,7 +3,7 @@ BEGIN {
     @INC = '../lib';
     require './test.pl';
 }
-plan tests=>76;
+plan tests=>71;
 
 sub a : lvalue { my $a = 34; ${\(bless \$a)} }  # Return a temporary
 sub b : lvalue { ${\shift} }
@@ -527,7 +527,8 @@ TODO: {
     is($blah, 8, "yada");
 }
 
-{ # bug #23790
+TODO: {
+    local $TODO = "bug #23790";
     my @arr  = qw /one two three/;
     my $line = "zero";
     sub lval_array () : lvalue {@arr}
@@ -537,13 +538,6 @@ TODO: {
     }
 
     is($line, "zeroonetwothree");
-
-    sub trythislval { scalar(@_)."x".join "", @_ }
-    is(trythislval(lval_array()), "3xonetwothree");
-
-    sub changeme { $_[2] = "free" }
-    changeme(lval_array);
-    is("@arr", "one two free");
 }
 
 {
@@ -575,26 +569,4 @@ Execution of - aborted due to compilation errors.
     sub lval_decl { $x }
     lval_decl = 5;
     is($x, 5, "subroutine declared with lvalue before definition retains lvalue. [perl #68758]");
-}
-
-sub fleen : lvalue { $pnare }
-$pnare = __PACKAGE__;
-ok eval { fleen = 1 }, "lvalues can return COWs (CATTLE?) [perl #75656]";\
-is $pnare, 1, 'and returning CATTLE actually works';
-
-{
-    my $result_3363;
-    sub a_3363 {
-        my ($word, $replace) = @_;
-        my $ref = \substr($word, 0, 1);
-        $$ref = $replace;
-        if ($replace eq "b") {
-            $result_3363 = $word;
-        } else {
-            a_3363($word, "b");
-        }
-    }
-    a_3363($_, "v") for "test";
-
-    is($result_3363, "best", "ref-to-substr retains lvalue-ness under recursion [perl #3363]");
 }
